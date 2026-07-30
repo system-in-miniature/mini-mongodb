@@ -19,9 +19,10 @@ The `Level` column is part of the teaching contract:
 | `query.matcher` scalar-vs-array equality | MQL multikey matching behavior | Equivalent | A scalar predicate can match an element of a stored array without explicit iteration. |
 | `query.matcher` literal document equality | BSON embedded-document equality | Equivalent | A literal embedded document is compared as a complete value, including field order; dotted paths select individual nested fields. |
 | `query.matcher` range comparisons | MQL comparison predicates | Semantically opposite | MongoDB normally applies type bracketing to range predicates; MiniMongoDB exposes its global teaching order across supported types. |
+| `query.matcher` top-level `$not` | field-level `$not` query operator | Semantically opposite | MiniMongoDB accepts a project-specific top-level logical `$not`; real MongoDB supports `$not` only as a field operator and rejects the top-level form. |
 | `update.operators` | MQL update modifiers | Intentionally simplified | Replacement and operator update are separate; path changes are single-document atomic. Operator options and array filters are absent. |
-| `index.IdIndex` | automatically-created unique `_id_` index | Equivalent | Every collection has identity uniqueness before a write becomes visible. The data structure is a Python hash map, not a B-tree. |
-| `collection.Collection` | collection CRUD layer | Intentionally simplified | Documents cross a copy boundary and writes report counts. There are no cursors, read concerns, sessions, or concurrent writers. |
+| `index.IdIndex` | automatically-created unique `_id_` index | Equivalent | Every collection has identity uniqueness under BSON-typed equality before a write becomes visible. Canonical tagged keys back a Python hash map, not a B-tree. |
+| `collection.Collection` | collection CRUD layer | Intentionally simplified | Documents cross a copy boundary and publish only after their journal entry is durable. Batch methods commit a prefix rather than acting as multi-document transactions. |
 | `oplog.OplogEntry` | replica-set oplog post-image/idempotence discipline | Intentionally simplified | Action updates become repeat-safe final assignments. Real oplog formats and version-specific update encodings are richer. |
 | `storage.journal` carrying oplog frames | WiredTiger journal plus replica oplog | Semantically opposite | Real MongoDB separates storage-engine recovery records from the replication oplog; M1 reuses logical oplog entries as its local durability journal. |
 | `storage.checkpoint` | WiredTiger checkpoint | Intentionally simplified | Restart begins from a snapshot and applies newer durable records. The snapshot is whole-database tagged JSON, without pages or MVCC. |
@@ -37,9 +38,10 @@ update_one({"_id": 1}, {"$inc": {"visits": 1}})
   → matcher selects one document
   → update engine mutates an isolated copy
   → immutable _id is validated
-  → collection swaps the copy atomically
-  → oplog records {"$set": {"visits": <final value>}}
+  → oplog prepares {"$set": {"visits": <final value>}}
   → journal appends length | payload | CRC and fsyncs
+  → oplog publishes its sequence and in-memory entry
+  → collection swaps the copy and index atomically
 ```
 
 The crucial ownership boundary is between the user command and the durable

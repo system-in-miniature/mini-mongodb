@@ -13,6 +13,7 @@ from typing import Any, Callable, Iterable
 from minimongodb.bson import (
     CounterObjectIdGenerator,
     bson_equal,
+    canonical_key,
     clone_document,
 )
 from minimongodb.errors import DuplicateKeyError, InvalidUpdateError
@@ -64,28 +65,26 @@ class Collection:
 
     def insert_many(self, documents: Iterable[dict[str, Any]]) -> InsertManyResult:
         candidates: list[dict[str, Any]] = []
-        pending_ids: set[Any] = set()
+        pending_ids: set[tuple[Any, ...]] = set()
         for source in documents:
             candidate = clone_document(source)
             if "_id" not in candidate:
                 candidate["_id"] = self._id_generator()
             key = candidate["_id"]
-            try:
-                duplicate = self._id_index.contains(key) or key in pending_ids
-                pending_ids.add(key)
-            except TypeError as error:
-                raise TypeError("_id must be hashable in MiniMongoDB") from error
+            canonical = canonical_key(key)
+            duplicate = self._id_index.contains(key) or canonical in pending_ids
+            pending_ids.add(canonical)
             if duplicate:
                 raise DuplicateKeyError(f"duplicate key for _id index: {key!r}")
             candidates.append(candidate)
 
-        # Validation happens for the whole batch before the first visible write.
+        # Validate the whole batch, then durably publish one document at a time.
         for candidate in candidates:
-            self._documents.append(candidate)
-            self._id_index.add(candidate)
             self.oplog.emit(
                 self.name, "insert", candidate["_id"], clone_document(candidate)
             )
+            self._documents.append(candidate)
+            self._id_index.add(candidate)
         return InsertManyResult([candidate["_id"] for candidate in candidates])
 
     def find(self, query: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -136,13 +135,13 @@ class Collection:
             matched += 1
             candidate = apply_operator_update(original, update)
             if not bson_equal(candidate, original):
-                self._replace_at(position, candidate)
                 self.oplog.emit(
                     self.name,
                     "update",
                     original["_id"],
                     self._post_image_update(candidate, update),
                 )
+                self._replace_at(position, candidate)
                 modified += 1
             if limit is not None and matched >= limit:
                 break
@@ -160,13 +159,13 @@ class Collection:
                 candidate = replacement_document(original, replacement)
                 modified = not bson_equal(candidate, original)
                 if modified:
-                    self._replace_at(position, candidate)
                     self.oplog.emit(
                         self.name,
                         "replace",
                         original["_id"],
                         clone_document(candidate),
                     )
+                    self._replace_at(position, candidate)
                 return UpdateResult(1, int(modified))
         return UpdateResult(0, 0)
 
@@ -178,15 +177,16 @@ class Collection:
 
     def _delete(self, query: dict[str, Any], *, limit: int | None) -> DeleteResult:
         deleted = 0
-        kept: list[dict[str, Any]] = []
-        for document in self._documents:
+        position = 0
+        while position < len(self._documents):
+            document = self._documents[position]
             if matches(document, query) and (limit is None or deleted < limit):
-                self._id_index.remove(document["_id"])
                 self.oplog.emit(self.name, "delete", document["_id"])
+                self._id_index.remove(document["_id"])
+                self._documents.pop(position)
                 deleted += 1
             else:
-                kept.append(document)
-        self._documents = kept
+                position += 1
         return DeleteResult(deleted)
 
     def _replace_at(self, position: int, document: dict[str, Any]) -> None:

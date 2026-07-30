@@ -134,6 +134,26 @@ def bson_equal(left: Any, right: Any) -> bool:
     return left == right
 
 
+def canonical_key(value: Any) -> tuple[Any, ...]:
+    """Return a hashable key with exactly ``bson_equal`` identity semantics."""
+
+    tag = type_tag(value)
+    if tag == "number":
+        if isinstance(value, float) and isnan(value):
+            return (tag, "nan")
+        return (tag, value)
+    if tag == "document":
+        return (
+            tag,
+            tuple((key, canonical_key(child)) for key, child in value.items()),
+        )
+    if tag == "array":
+        return (tag, tuple(canonical_key(child) for child in value))
+    if tag == "objectId":
+        return (tag, value.value)
+    return (tag, value)
+
+
 def bson_compare(left: Any, right: Any) -> int:
     """Three-way comparison using MiniMongoDB's documented type order."""
 

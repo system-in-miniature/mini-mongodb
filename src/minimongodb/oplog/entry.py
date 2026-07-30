@@ -61,9 +61,9 @@ class Oplog:
             key=key,
             payload=clone_document(payload) if payload is not None else None,
         )
-        self._next_sequence += 1
-        self._entries.append(entry)
         if self._listener is not None:
-            # Persistence observes only complete in-memory mutations.
+            # Durable acceptance is the publication boundary.
             self._listener(entry)
+        self._entries.append(entry)
+        self._next_sequence += 1
         return entry

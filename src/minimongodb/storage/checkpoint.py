@@ -19,6 +19,12 @@ def write_checkpoint(path: str | Path, state: dict[str, Any]) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(temporary, destination)
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    directory_fd = os.open(destination.parent, flags)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def read_checkpoint(path: str | Path) -> dict[str, Any] | None:

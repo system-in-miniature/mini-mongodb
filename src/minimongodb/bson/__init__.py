@@ -6,6 +6,7 @@ from minimongodb.bson.types import (
     ObjectId,
     bson_compare,
     bson_equal,
+    canonical_key,
     clone_document,
     type_tag,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "ObjectId",
     "bson_compare",
     "bson_equal",
+    "canonical_key",
     "clone_document",
     "get_path",
     "set_path",

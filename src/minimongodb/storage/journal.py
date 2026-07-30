@@ -24,10 +24,34 @@ class Journal:
         payload = encode_entry(entry)
         frame = _U32.pack(len(payload)) + payload + _U32.pack(zlib.crc32(payload))
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("ab") as stream:
-            stream.write(frame)
-            stream.flush()
-            os.fsync(stream.fileno())
+        previous_size = self.path.stat().st_size if self.path.exists() else 0
+        try:
+            with self.path.open("ab") as stream:
+                written = stream.write(frame)
+                if written != len(frame):
+                    raise OSError(
+                        f"short journal write: expected {len(frame)}, wrote {written}"
+                    )
+                stream.flush()
+                os.fsync(stream.fileno())
+        except Exception:
+            self._rollback_append(previous_size)
+            raise
+
+    def _rollback_append(self, previous_size: int) -> None:
+        """Best-effort removal of bytes from an append that reported failure."""
+
+        if not self.path.exists():
+            return
+        try:
+            with self.path.open("r+b") as stream:
+                stream.truncate(previous_size)
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError:
+            # Preserve the original append error; restart tail repair remains
+            # the final defense if the cleanup fsync also fails.
+            pass
 
     def read_entries(self, *, repair: bool = True) -> list[OplogEntry]:
         if not self.path.exists():

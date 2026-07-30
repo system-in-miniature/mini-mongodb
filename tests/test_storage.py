@@ -1,5 +1,6 @@
 """CRC journal framing, tail repair, and checkpoint snapshot contracts."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -63,3 +64,31 @@ def test_checkpoint_round_trips_tagged_object_ids(tmp_path: Path) -> None:
     }
     write_checkpoint(path, state)
     assert read_checkpoint(path) == state
+
+
+def test_checkpoint_fsyncs_parent_directory_after_replace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    directory_fd = 4242
+    opened: list[tuple[Path, int]] = []
+    fsynced: list[int] = []
+    closed: list[int] = []
+
+    def record_open(path, flags):
+        opened.append((Path(path), flags))
+        return directory_fd
+
+    monkeypatch.setattr(os, "open", record_open)
+    monkeypatch.setattr(os, "fsync", fsynced.append)
+    monkeypatch.setattr(os, "close", closed.append)
+
+    write_checkpoint(tmp_path / "checkpoint.bin", {"sequence": 0, "collections": {}})
+
+    assert opened == [
+        (
+            tmp_path,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+        )
+    ]
+    assert fsynced[-1] == directory_fd
+    assert closed == [directory_fd]

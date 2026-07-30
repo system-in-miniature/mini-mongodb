@@ -1,5 +1,7 @@
 """Public CRUD contract and automatic unique ``_id`` index."""
 
+from math import nan
+
 import pytest
 
 from minimongodb import Collection, CounterObjectIdGenerator, ObjectId
@@ -33,6 +35,37 @@ def test_id_index_rejects_duplicate_key_without_partial_insert_many() -> None:
     with pytest.raises(DuplicateKeyError):
         collection.insert_many([{"_id": "new"}, {"_id": "same"}])
     assert collection.find({}) == [{"_id": "same", "n": 1}]
+
+
+def test_id_index_keeps_bool_distinct_from_numeric_ids() -> None:
+    collection = Collection()
+    collection.insert_many([{"_id": True}, {"_id": 1}])
+    assert collection.find() == [{"_id": True}, {"_id": 1}]
+
+
+def test_id_index_uses_bson_numeric_equality_across_int_and_float() -> None:
+    collection = Collection()
+    collection.insert_one({"_id": 1})
+    with pytest.raises(DuplicateKeyError):
+        collection.insert_one({"_id": 1.0})
+
+    boundary = Collection()
+    boundary.insert_many([{"_id": 2**53 + 1}, {"_id": float(2**53 + 1)}])
+    assert len(boundary.find()) == 2
+
+
+def test_id_index_canonicalizes_nan_and_nested_bson_values() -> None:
+    nan_ids = Collection()
+    nan_ids.insert_one({"_id": nan})
+    with pytest.raises(DuplicateKeyError):
+        nan_ids.insert_one({"_id": nan})
+
+    nested_ids = Collection()
+    nested_ids.insert_one({"_id": {"a": [True, 1], "b": 2}})
+    with pytest.raises(DuplicateKeyError):
+        nested_ids.insert_one({"_id": {"a": [True, 1], "b": 2.0}})
+    nested_ids.insert_one({"_id": {"b": 2, "a": [True, 1]}})
+    assert len(nested_ids.find()) == 2
 
 
 def test_delete_one_and_many_report_deleted_counts() -> None:

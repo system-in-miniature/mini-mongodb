@@ -42,12 +42,18 @@ introduced by M1.
   significant. Persistence preserves that order using ordered key/value pairs.
 - Real ObjectIds include non-deterministic/environment-derived material.
   MiniMongoDB's 24-hex-digit analogue is only an injected monotonic counter.
-- `_id` must be hashable because the M1 index is a Python map.
+- The `_id` index recursively converts values to hashable canonical keys with
+  BSON type tags. Thus `True` and `1` are distinct, while numerically equal
+  int/float values share one identity, matching this project's `bson_equal`.
 
 ## Query differences
 
 - Implemented operators are only `$eq` (including implicit equality),
   `$gt/$gte/$lt/$lte/$ne/$in/$exists/$and/$or/$not`.
+- Field-level `$not` follows the supported MongoDB-shaped subset. MiniMongoDB
+  additionally accepts `$not` as a top-level logical operator; real MongoDB
+  does not support top-level `$not`. This is a project extension, not portable
+  MQL behavior.
 - Scalar equality and comparison inspect stored array elements recursively.
   Literal array equality remains whole-array and order-sensitive.
 - Literal embedded documents use exact whole-value equality. Use a dotted path
@@ -74,6 +80,12 @@ introduced by M1.
   modes, find-and-modify variants, or write concern.
 - `insert_many` validates the batch before making any document visible.
   Generated counter values consumed by a rejected batch are not rolled back.
+- `insert_many`, `update_many`, and `delete_many` are not all-or-nothing
+  durability transactions. `insert_many` validates all candidates first; each
+  batch method then prepares and commits one document at a time. If journal
+  append for item N fails, the earlier items remain durable and visible, item N
+  and later items remain invisible, the failing sequence is not consumed, and
+  the storage error is raised.
 - Single-document mutation is atomic only in the single Python process: the
   engine builds and validates a copy before swapping it. There is no concurrent
   reader/writer isolation.
@@ -96,13 +108,17 @@ introduced by M1.
 - The local journal frames logical oplog entries as
   `4-byte length | payload | 4-byte CRC32`. Real MongoDB uses WiredTiger's
   storage-engine journal separately from the replication oplog.
-- Appends flush and `fsync` before returning. There is no group commit.
+- Appends flush and `fsync` before the document, `_id` index, sequence, or
+  in-memory oplog entry becomes visible. A failed append is best-effort
+  truncated back to its prior boundary and the storage error is raised. There
+  is no group commit.
 - Only an invalid final frame is repaired by truncating to the last valid
   prefix. A CRC/decode failure before later bytes raises corruption instead of
   silently discarding history.
-- Checkpoints serialize the whole database as tagged JSON and replace one file
-  atomically. They have no independent checksum, pages, compression, fuzzy
-  checkpoint protocol, or concurrent-write coordination.
+- Checkpoints serialize the whole database as tagged JSON, replace one file
+  atomically, and `fsync` the parent directory after rename. They have no
+  independent checksum, pages, compression, fuzzy checkpoint protocol, or
+  concurrent-write coordination.
 - Startup loads the checkpoint and replays only journal sequences newer than
   the snapshot. Replay does not recursively append new records.
 - The public `inject_journal_tail_truncation` method exists only for
