@@ -49,7 +49,12 @@ MiniMongoDB 持有自己的副本，所以调用者后续的修改不会改变�
 
 校验之后，`Collection.insert_many` 按输入顺序处理候选文档。每个候选先调用 `src/minimongodb/oplog/entry.py::Oplog.emit`，随后追加到 `_documents`，加入 `IdIndex`，并更新二级索引。纯内存集合没有 journal listener，因此 `emit` 直接记录到本地 oplog。目录持久化 `Database` 则把 `src/minimongodb/storage/journal.py::Journal.append` 作为 listener；第 5 章会解释这为何改变发布边界。
 
-查询进入 `src/minimongodb/collection.py::Collection._run_query`。它先用空文档调用 `src/minimongodb/query/matcher.py::matches`，确保即使集合为空也会校验查询语法；然后向 `src/minimongodb/plan/__init__.py::choose_plan` 请求 COLLSCAN 或 IXSCAN。无论候选来自哪里，最终都由同一个 `matches` 函数决定语义。规划只能减少工作，不能改变匹配集合。结果保持插入顺序，使实验和测试可重复。
+查询进入 `src/minimongodb/collection.py::Collection._run_query`。规划前，它先用空文档调用
+`src/minimongodb/query/matcher.py::matches`。`matches` 会先用独立的
+`validate_query` 完整遍历算子结构，然后才尝试任何依赖文档的匹配；因此即使集合为空，
+malformed 查询也会被拒绝。随后 `_run_query` 向
+`src/minimongodb/plan/__init__.py::choose_plan` 请求 COLLSCAN 或 IXSCAN。
+无论候选来自哪里，最终都由同一个 `matches` 函数决定语义。规划只能减少工作，不能改变匹配集合。结果保持插入顺序，使实验和测试可重复。
 
 这已经构成完整的数据库形状闭环：
 

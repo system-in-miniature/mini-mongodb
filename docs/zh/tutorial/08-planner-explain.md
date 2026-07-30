@@ -35,8 +35,9 @@ return {
 
 `find`、`find_one` 与 `count_documents` 使用同一个 `_run_query`；
 explain 不是另一套模拟。选择计划前，`_run_query` 调用
-`matches({}, normalized)`。这个看似奇怪的空文档匹配，保证即使
-collection 为空或索引产生零候选，也会验证查询语法。
+`matches({}, normalized)`。`matches` 会先调用独立的 `validate_query`，
+在任何依赖文档的匹配之前递归检查完整算子结构。因此这个看似奇怪的空文档调用，
+即使在 collection 为空或索引产生零候选时，也能完整验证查询语法。
 
 计划只提供候选来源。collection scan 的 `candidates` 是保持插入顺序的
 文档列表；index scan 的计划则提供 canonical 文档 id。由于 index
@@ -96,8 +97,10 @@ ownership bucket 推导 candidate cardinality。确定性表示相同状态产�
 ## 8.4 阅读三个计数
 
 `nReturned` 是通过完整 matcher 的候选数；`docsExamined` 是送入 matcher
-的候选文档数；`keysExamined` 是 index scan 访问的匹配不同 key bucket
-数。collection scan 没读索引，所以 key 数为零。
+的候选文档数。对于 secondary index，`keysExamined` 是 scan 访问的匹配
+distinct key bucket 数；自动 `_id_` fast path 使用另一种单位：它统计 lookup
+probe，标量 equality 操作数计一次，`$in` array 中每个值各计一次，重复值和
+不存在的值也照计。collection scan 没读索引，所以 key 数为零。
 
 四个文档中只有一个满足 `kind == "rare"` 时：
 

@@ -14,8 +14,20 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from minimongodb.bson import MISSING, bson_compare, bson_equal
+from minimongodb.bson import bson_compare, bson_equal
 from minimongodb.errors import InvalidQueryError
+
+_FIELD_OPERATORS = {
+    "$eq",
+    "$gt",
+    "$gte",
+    "$lt",
+    "$lte",
+    "$ne",
+    "$in",
+    "$exists",
+    "$not",
+}
 
 
 def resolve_path(document: Any, path: str) -> list[Any]:
@@ -24,6 +36,55 @@ def resolve_path(document: Any, path: str) -> list[Any]:
     if not isinstance(path, str) or not path or any(not p for p in path.split(".")):
         raise InvalidQueryError("field path must have non-empty segments")
     return _resolve(document, path.split("."))
+
+
+def validate_query(query: Any) -> None:
+    """Validate the complete supported query grammar without reading a document."""
+
+    if not isinstance(query, dict):
+        raise InvalidQueryError("query must be a document")
+    for key, condition in query.items():
+        if not isinstance(key, str):
+            raise InvalidQueryError("query keys must be strings")
+        if key in {"$and", "$or"}:
+            if not isinstance(condition, list):
+                raise InvalidQueryError(f"{key} requires an array")
+            for child in condition:
+                validate_query(child)
+        elif key == "$not":
+            if not isinstance(condition, dict):
+                raise InvalidQueryError("$not requires a query document")
+            validate_query(condition)
+        elif key.startswith("$"):
+            raise InvalidQueryError(f"unsupported logical operator: {key}")
+        else:
+            resolve_path({}, key)
+            _validate_field_condition(condition)
+
+
+def _validate_field_condition(condition: Any) -> None:
+    if not isinstance(condition, dict):
+        return
+    operators = [
+        key
+        for key in condition
+        if isinstance(key, str) and key.startswith("$")
+    ]
+    if not operators:
+        return
+    if len(operators) != len(condition):
+        raise InvalidQueryError("cannot mix operators and literal fields")
+    for operator, operand in condition.items():
+        if operator not in _FIELD_OPERATORS:
+            raise InvalidQueryError(f"unsupported query operator: {operator}")
+        if operator == "$exists" and not isinstance(operand, bool):
+            raise InvalidQueryError("$exists requires a boolean")
+        if operator == "$in" and not isinstance(operand, list):
+            raise InvalidQueryError("$in requires an array")
+        if operator == "$not":
+            if not isinstance(operand, dict):
+                raise InvalidQueryError("$not requires an operator document")
+            _validate_field_condition(operand)
 
 
 def _resolve(current: Any, parts: list[str]) -> list[Any]:
@@ -123,8 +184,7 @@ def matches(document: dict[str, Any], query: dict[str, Any] | None = None) -> bo
 
     if query is None:
         query = {}
-    if not isinstance(query, dict):
-        raise InvalidQueryError("query must be a document")
+    validate_query(query)
     for key, condition in query.items():
         if key == "$and":
             if not isinstance(condition, list):

@@ -38,9 +38,11 @@ return {
 
 `find`, `find_one`, and `count_documents` use the same `_run_query`; explain is
 not a separate simulation. Before choosing a plan, `_run_query` calls
-`matches({}, normalized)`. This apparently odd empty-document match validates
-query syntax even when the collection is empty or an index would produce zero
-candidates.
+`matches({}, normalized)`. `matches` first invokes the independent
+`validate_query` pass, which recursively checks the complete operator
+structure before document-dependent matching. This apparently odd
+empty-document call therefore validates query syntax even when the collection
+is empty or an index would produce zero candidates.
 
 The plan provides only a candidate source. When it is a collection scan,
 `candidates` is the insertion-ordered document list. When it is an index scan,
@@ -108,8 +110,11 @@ call recomputes this small choice.
 
 `nReturned` is the number of candidates that pass the full matcher.
 `docsExamined` is the number of candidate documents passed to the matcher.
-`keysExamined` is the number of matching distinct index-key buckets visited by
-the index scan. A collection scan reports zero keys because no index is read.
+For a secondary index, `keysExamined` is the number of matching distinct
+index-key buckets visited by the scan. The automatic `_id_` fast path uses a
+different unit: it counts lookup probes, one for each scalar equality operand
+or each value in a `$in` array, including duplicate and nonexistent values.
+A collection scan reports zero keys because no index is read.
 
 For four documents where only one has `kind == "rare"`:
 

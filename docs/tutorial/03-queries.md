@@ -127,11 +127,13 @@ document. It recursively matches the child and negates the result. Real
 MongoDB does not support top-level `$not`; it supports `$nor` and field-level
 `$not`. Any query using this local extension is intentionally nonportable.
 
-Unsupported dollar-prefixed keys raise `InvalidQueryError`. Validation is
-performed even for an empty collection because `_run_query` invokes
-`matches({}, query)` before planning. A bad query must not become silently
-valid merely because no data happened to be stored or an index returned zero
-candidates.
+Unsupported dollar-prefixed keys raise `InvalidQueryError`. At the start of
+`matches`, the independent `validate_query` pass recursively validates every
+logical branch and field-operator operand, including requirements such as
+“`$in` must receive an array.” `_run_query` invokes `matches({}, query)` before
+planning, so this complete validation also runs for an empty collection or a
+zero-candidate index scan. A bad query must not become silently valid merely
+because no data happened to be stored.
 
 ## Compared with real MongoDB
 

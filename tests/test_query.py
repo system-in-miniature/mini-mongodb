@@ -2,6 +2,7 @@
 
 import pytest
 
+from minimongodb import Collection
 from minimongodb.errors import InvalidQueryError
 from minimongodb.query import matches
 
@@ -35,3 +36,20 @@ def test_ne_matches_a_missing_field() -> None:
 def test_unknown_operator_is_rejected() -> None:
     with pytest.raises(InvalidQueryError):
         matches({"age": 20}, {"age": {"$wat": 20}})
+
+
+@pytest.mark.parametrize("method_name", ["find", "explain"])
+def test_empty_collection_rejects_non_array_in_before_planning(
+    method_name: str,
+) -> None:
+    collection = Collection("empty")
+
+    with pytest.raises(InvalidQueryError, match=r"\$in requires an array"):
+        getattr(collection, method_name)({"x": {"$in": 1}})
+
+
+def test_query_validation_checks_logical_branches_before_matching() -> None:
+    query = {"$and": [{"x": 1}, {"y": {"$in": 2}}]}
+
+    with pytest.raises(InvalidQueryError, match=r"\$in requires an array"):
+        matches({}, query)

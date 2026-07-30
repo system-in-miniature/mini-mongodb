@@ -96,9 +96,12 @@ its local oplog. A directory-backed `Database` supplies
 `src/minimongodb/storage/journal.py::Journal.append` as the listener; Chapter 5
 will show why that changes the publication boundary.
 
-Queries enter `src/minimongodb/collection.py::Collection._run_query`. It first
-calls `src/minimongodb/query/matcher.py::matches` against an empty document to
-validate query syntax even when the collection has no data. It then asks
+Queries enter `src/minimongodb/collection.py::Collection._run_query`. Before
+planning, it calls `src/minimongodb/query/matcher.py::matches` against an empty
+document. `matches` first runs the independent `validate_query` pass over the
+complete operator structure, before attempting any document-dependent match;
+therefore malformed queries are rejected even when the collection has no
+data. `_run_query` then asks
 `src/minimongodb/plan/__init__.py::choose_plan` for either a collection scan or
 an index scan. Regardless of the candidate source, the same `matches`
 function decides semantics. Planning may reduce work; it must never change

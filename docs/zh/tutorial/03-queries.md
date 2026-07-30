@@ -72,7 +72,11 @@ operator document 内的项目以 `all` 组合。对标量字段，`{"age": {"$g
 
 MiniMongoDB 还接受项目专属的顶层 `$not` 查询文档，递归匹配子查询后取反。真实 MongoDB 不支持顶层 `$not`，而支持 `$nor` 和字段级 `$not`；使用本地扩展的查询有意不可移植。
 
-未知美元前缀键会抛出 `InvalidQueryError`。即使集合为空也会校验，因为 `_run_query` 在 planning 前调用 `matches({}, query)`。坏查询不能仅因当前无数据或索引给出零候选就悄悄变合法。
+未知美元前缀键会抛出 `InvalidQueryError`。`matches` 一开始就由独立
+`validate_query` 递归验证每个逻辑分支和字段算子操作数，包括“`$in`
+必须接收 array”这类结构要求。`_run_query` 在 planning 前调用
+`matches({}, query)`，所以空集合或索引零候选时也会执行完整验证；
+坏查询不能仅因当前无数据就悄悄变合法。
 
 ## 与真实 MongoDB 对照
 
