@@ -2,6 +2,8 @@
 
 # MiniMongoDB
 
+[![CI](https://github.com/system-in-miniature/MiniMongoDB/actions/workflows/ci.yml/badge.svg)](https://github.com/system-in-miniature/MiniMongoDB/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)
+
 MiniMongoDB 是第七个**微型系统（System-in-Miniature）**项目：一个使用 Python
 编写、具备确定性（deterministic）且以单进程（single-process）运行的文档
 数据库内核（document database kernel）。它是教学模型，并非与
@@ -132,3 +134,7 @@ MiniMongoDB M1 则最适合由内而外地理解：从 BSON 的值/路径语义�
 
 在把成功运行实验当作生产级 MongoDB 的证据之前，请阅读
 [概念映射](docs/zh/mapping.md)和[已声明的差异](docs/zh/DIFFERENCES.md)。
+
+## 商标声明
+
+MiniMongoDB 是独立的教学项目，与 MongoDB, Inc. 无隶属、背书或赞助关系。"MongoDB" 商标归其所有者所有。

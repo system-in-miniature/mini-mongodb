@@ -2,6 +2,8 @@
 
 # MiniMongoDB
 
+[![CI](https://github.com/system-in-miniature/MiniMongoDB/actions/workflows/ci.yml/badge.svg)](https://github.com/system-in-miniature/MiniMongoDB/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)
+
 MiniMongoDB is the seventh **System-in-Miniature** project: a deterministic,
 single-process document database kernel written in Python. It is a teaching
 model, not a MongoDB-compatible server—there is no wire protocol, JavaScript
@@ -135,3 +137,7 @@ comparison more symmetrical.
 See [concept mapping](docs/mapping.md) and
 [declared differences](docs/DIFFERENCES.md) before treating a successful lab as
 evidence about production MongoDB.
+
+## Trademark Notice
+
+MiniMongoDB is an independent educational project. It is not affiliated with, endorsed by, or sponsored by MongoDB, Inc.. "MongoDB" is a trademark of its respective owner.
