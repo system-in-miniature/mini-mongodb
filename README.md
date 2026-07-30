@@ -2,7 +2,7 @@
 
 # MiniMongoDB
 
-[![CI](https://github.com/system-in-miniature/MiniMongoDB/actions/workflows/ci.yml/badge.svg)](https://github.com/system-in-miniature/MiniMongoDB/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)
+[![CI](https://github.com/system-in-miniature/mini-mongodb/actions/workflows/ci.yml/badge.svg)](https://github.com/system-in-miniature/mini-mongodb/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)
 
 MiniMongoDB is the seventh **System-in-Miniature** project: a deterministic,
 single-process document database kernel written in Python. It is a teaching

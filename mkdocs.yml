@@ -1,8 +1,8 @@
 site_name: MiniMongoDB Tutorial
 site_description: A chapter-oriented guide to document-database mechanisms in miniature
-site_url: https://system-in-miniature.github.io/MiniMongoDB/
-repo_url: https://github.com/system-in-miniature/MiniMongoDB
-repo_name: system-in-miniature/MiniMongoDB
+site_url: https://system-in-miniature.github.io/mini-mongodb/
+repo_url: https://github.com/system-in-miniature/mini-mongodb
+repo_name: system-in-miniature/mini-mongodb
 docs_dir: docs
 
 theme:
@@ -21,13 +21,13 @@ markdown_extensions:
 nav:
   - English:
       - Chapter 1 · Quick start: index.md
-      - Chapter 2 · Architecture overview: https://github.com/system-in-miniature/MiniMongoDB#directory-guide
+      - Chapter 2 · Architecture overview: https://github.com/system-in-miniature/mini-mongodb#directory-guide
       - Chapter 3 · Mechanisms and MongoDB mapping: mapping.md
       - Chapter 4 · Hands-on experiments: labs-guide.md
       - Chapter 5 · Differences from MongoDB: DIFFERENCES.md
   - 中文版:
       - 第 1 章 · 快速开始: zh/index.md
-      - 第 2 章 · 架构总览: https://github.com/system-in-miniature/MiniMongoDB/blob/main/README.zh-CN.md
+      - 第 2 章 · 架构总览: https://github.com/system-in-miniature/mini-mongodb/blob/main/README.zh-CN.md
       - 第 3 章 · 机制与 MongoDB 映射: zh/mapping.md
       - 第 4 章 · 动手实验: zh/labs-guide.md
       - 第 5 章 · 与 MongoDB 的差异: zh/DIFFERENCES.md
