@@ -17,30 +17,50 @@ theme:
 markdown_extensions:
   - admonition
   - attr_list
+  - pymdownx.details
+  - pymdownx.superfences
   - toc:
       permalink: true
 
 nav:
-  - English:
-      - Chapter 1 · Quick start: index.md
-      - Chapter 2 · Architecture overview: https://github.com/system-in-miniature/mini-mongodb#directory-guide
-      - Chapter 3 · Mechanisms and MongoDB mapping: mapping.md
-      - Chapter 4 · Hands-on experiments:
-          - Lab guide: labs-guide.md
-          - Lab · Multikey index: https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_multikey_index.py
-          - Lab · Explain comparison: https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_explain.py
-      - Chapter 5 · Differences from MongoDB: DIFFERENCES.md
-  - 中文版:
-      - 第 1 章 · 快速开始: zh/index.md
-      - 第 2 章 · 架构总览: https://github.com/system-in-miniature/mini-mongodb/blob/main/README.zh-CN.md
-      - 第 3 章 · 机制与 MongoDB 映射: zh/mapping.md
-      - 第 4 章 · 动手实验:
-          - 实验指南: zh/labs-guide.md
-          - Lab · Multikey 索引: https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_multikey_index.py
-          - Lab · Explain 对比: https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_explain.py
-      - 第 5 章 · 与 MongoDB 的差异: zh/DIFFERENCES.md
-  - Design history archive · 设计历史存档:
-      - Archive notice · 存档说明: superpowers/README.md
-      - M1 implementation plan: superpowers/plans/2026-07-30-minimongodb-m1.md
-      - Final-audit design: superpowers/specs/2026-07-30-final-audit-correctness-design.md
-      - Final-audit plan: superpowers/plans/2026-07-30-final-audit-correctness.md
+  - English Tutorial:
+      - Book Home: index.md
+      - 01 · Meet MiniMongoDB: tutorial/01-getting-started.md
+      - 02 · The Document Model: tutorial/02-document-model.md
+      - 03 · Query Semantics: tutorial/03-queries.md
+      - 04 · Update Operators: tutorial/04-updates.md
+      - 05 · Durability and Recovery: tutorial/05-durability.md
+      - 06 · The Oplog: tutorial/06-oplog.md
+      - 07 · Secondary Indexes: tutorial/07-secondary-indexes.md
+      - 08 · Planning and Explain: tutorial/08-planner-explain.md
+      - 09 · Aggregation Pipelines: tutorial/09-aggregation.md
+      - 10 · Relational versus Document: tutorial/10-relational-vs-document.md
+  - 中文教程:
+      - 全书目录: zh/index.md
+      - 01 · 认识 MiniMongoDB: zh/tutorial/01-getting-started.md
+      - 02 · 文档模型: zh/tutorial/02-document-model.md
+      - 03 · 查询语义: zh/tutorial/03-queries.md
+      - 04 · 更新算子: zh/tutorial/04-updates.md
+      - 05 · 持久性与恢复: zh/tutorial/05-durability.md
+      - 06 · Oplog: zh/tutorial/06-oplog.md
+      - 07 · 二级索引: zh/tutorial/07-secondary-indexes.md
+      - 08 · 规划与 Explain: zh/tutorial/08-planner-explain.md
+      - 09 · 聚合管道: zh/tutorial/09-aggregation.md
+      - 10 · 关系模型与文档模型: zh/tutorial/10-relational-vs-document.md
+  - Reference · 参考资料:
+      - English:
+          - Architecture and source guide: https://github.com/system-in-miniature/mini-mongodb#directory-guide
+          - Mechanism mapping: mapping.md
+          - Hands-on lab guide: labs-guide.md
+          - Differences from MongoDB: DIFFERENCES.md
+      - 中文:
+          - 架构与源码导览: https://github.com/system-in-miniature/mini-mongodb/blob/main/README.zh-CN.md
+          - 机制映射: zh/mapping.md
+          - 动手实验指南: zh/labs-guide.md
+          - 与 MongoDB 的差异: zh/DIFFERENCES.md
+      - Design history archive · 设计历史存档:
+          - Archive notice · 存档说明: superpowers/README.md
+          - M1 implementation plan: superpowers/plans/2026-07-30-minimongodb-m1.md
+          - M2 implementation plan: superpowers/plans/2026-07-30-minimongodb-m2.md
+          - Final-audit design: superpowers/specs/2026-07-30-final-audit-correctness-design.md
+          - Final-audit plan: superpowers/plans/2026-07-30-final-audit-correctness.md
