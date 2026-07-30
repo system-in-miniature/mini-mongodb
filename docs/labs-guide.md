@@ -49,5 +49,32 @@ discarded. The exact remaining-byte count is an implementation detail. Watch
 the recovery boundary between an atomic checkpoint and the valid journal-frame
 prefix.
 
+## Multikey index expansion
+
+Source:
+[lab_multikey_index.py](https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_multikey_index.py)
+
+```bash
+uv run python labs/lab_multikey_index.py
+```
+
+Expected: the `tags` index reports `multikey: True` and four distinct index
+keys across three documents; querying `"database"` returns document ids
+`[1, 2]`. Watch how one array-bearing document owns several canonical keys
+while repeated values inside one document would be de-duplicated.
+
+## Explain before and after indexing
+
+Source:
+[lab_explain.py](https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_explain.py)
+
+```bash
+uv run python labs/lab_explain.py
+```
+
+Expected: the same selective query changes from `COLLSCAN` examining four
+documents to `IXSCAN` examining one. The matcher and returned result do not
+change; only the planner's candidate source and scan work change.
+
 Continue with the [MongoDB mapping](mapping.md) and
 [declared differences](DIFFERENCES.md).

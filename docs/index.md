@@ -3,9 +3,10 @@
 [中文版](zh/index.md)
 
 MiniMongoDB is a deterministic, single-process Python document-database kernel
-for learning dotted paths, array-aware matching, update routing, automatic
-`_id` uniqueness, idempotent post-image oplogs, CRC-framed journals,
-checkpoints, and startup recovery. It is not a MongoDB-compatible server.
+for learning dotted paths, array-aware matching, canonical multikey indexes,
+COLLSCAN/IXSCAN planning, aggregation pipelines, idempotent post-image oplogs,
+CRC-framed journals, checkpoints, and startup recovery. It is not a
+MongoDB-compatible server.
 
 ## Install
 
@@ -30,8 +31,8 @@ a dotted path selects the nested field directly.
 ## Reading path
 
 Start with the repository's end-to-end data path and directory guide. Read the
-mapping next, run all three labs, and finish with the differences chapter to
-keep this M1 teaching model separate from production MongoDB semantics.
+mapping next, run all five labs, and finish with the differences chapter to
+keep this M2 teaching model separate from production MongoDB semantics.
 
 The [English README](https://github.com/system-in-miniature/MiniMongoDB#readme)
 contains the complete implemented scope and persistent API example. The

@@ -3,8 +3,8 @@
 # 与 MongoDB 的差异
 
 MiniMongoDB 是机制模型（mechanism model），而不是兼容性实现
-（compatibility implementation）。本文档记录了该设计的非目标，以及 M1
-引入的较小语义差异。
+（compatibility implementation）。本文档记录了该设计的非目标，以及 M2
+及之前引入的较小语义差异。
 
 ## 明确的非目标
 
@@ -22,10 +22,10 @@ MiniMongoDB 是机制模型（mechanism model），而不是兼容性实现
 
 - **M1（已实现）：** 值/路径语义、CRUD、查询/更新子集、自动 `_id`、幂等
   操作日志（oplog）、日志、检查点、恢复和实验。
-- **M2（未实现）：** 二级/复合/唯一索引、选择性、IXSCAN/COLLSCAN 规划、
-  `explain`、聚合管道。
+- **M2（已实现）：** 二级/复合/唯一/multikey 索引、前缀感知选择性、
+  IXSCAN/COLLSCAN 规划、`explain` 和最小聚合管道。
 - **M3（未实现）：** 封顶/环形操作日志保留，以及到 MiniDist 的复制映射。
-  `oplog/capped.py`、`plan/` 和 `aggregate/` 是文档边界，不是可工作的替代品。
+  现在只有 `oplog/capped.py` 仍是文档边界。
 
 ## BSON 与标识差异
 
@@ -57,9 +57,41 @@ MiniMongoDB 是机制模型（mechanism model），而不是兼容性实现
 - MongoDB 的 `{field: null}` 也会匹配缺失字段。MiniMongoDB 区分 null 和
   缺失；对缺失字段请使用 `$exists: false`。
 - 不提供 `$elemMatch`；因此，数组路径上的多个谓词可能由不同元素分别满足。
-- M1 不提供投影（projection）、排序（sort）、skip、limit、游标（cursor）、
-  排序规则、正则表达式或查询规划器快捷方式。`find` 按插入顺序返回一个立即
-  求值的列表。
+- `find` 不提供 projection、sort、skip、limit、cursor、collation 或 regex
+  选项；即使 IXSCAN 缩小了候选集，它仍按插入顺序返回立即求值的列表。
+  projection/sort/limit 只作为聚合 stage 提供。
+
+## 索引与规划器差异
+
+- 二级索引是仅升序的 canonical 有序映射，不是 B-tree。支持点分字段和复合
+  最左前缀；不支持降序、稀疏、部分、通配符、哈希、文本或地理空间索引。
+- 索引键与 `_id` 使用同一套递归 BSON 标签 canonical 形式。数组递归展开成
+  逐元素 multikey 条目，同一文档拥有的重复键会去重。
+- 当多个被索引字段都是数组时，复合索引会形成笛卡尔积。真实 MongoDB 会拒绝
+  一个文档中超过一个索引字段为数组的复合 multikey 索引；本微型实现为了显式
+  展示展开机制而保留乘积。
+- 缺失字段使用类似 null 的键。没有 sparse 选项，因此 unique 索引对该
+  missing/null 键只允许一个文档。
+- 创建索引会先验证现有文档，追加持久的 `create_index` 条目，再发布定义。
+  定义也进入 checkpoint；文档变更只有在 journal 成功后才更新全部索引。
+- 规划器没有统计目录、直方图、计划缓存、索引交集、覆盖查询、排序满足或试运行。
+  它统计前缀兼容索引的候选所有者，仅当候选数小于集合大小时选择 IXSCAN。
+- 安全的 `_id` 相等查询使用自动 `_id_` IXSCAN。由于本教学模型仍允许根 `_id`
+  为数组，只要存在这种 id，标量谓词就回退 COLLSCAN，避免丢失 matcher 的
+  数组元素展开语义。
+- `explain(query)` 是立即求值的集合方法，而不是 cursor 方法。它只报告一个
+  胜出计划和 `keysExamined/docsExamined/nReturned`，没有 verbosity 模式、
+  rejected plans、耗时、yield 或存储指标。
+
+## 聚合差异
+
+- 只实现 `$match/$project/$group/$sort/$limit`。`$match` 复用普通 matcher；
+  不做管道改写或索引下推。
+- `$group` 支持 `_id` 与 `$sum/$avg/$min/$max/$push`。表达式仅限常量、
+  点分 `$field` 引用或嵌套文档/list 形状，不提供完整 MongoDB 表达式语言。
+- `$match`、`$project`、`$limit` 流式执行；`$group`、`$sort` 在内存中物化
+  输入。不提供 spill、并行、分布式 merge、`$lookup`、`$unwind`、窗口函数
+  或优化器。
 
 ## 更新与 CRUD 差异
 
@@ -82,8 +114,8 @@ MiniMongoDB 是机制模型（mechanism model），而不是兼容性实现
 
 ## 操作日志差异
 
-- M1 为每个受影响的文档生成一个条目，而不是生成与 MongoDB 字节兼容的
-  操作日志记录。
+- MiniMongoDB 为每个受影响的文档生成一个条目（另有索引定义条目），而不是
+  生成与 MongoDB 字节兼容的操作日志记录。
 - 插入/替换记录携带完整文档。更新记录为每个请求的路径携带 `$set` 和
   `$unset` 后像；`$inc`、`$push` 和 `$pull` 永远不会保留到条目中。
 - 当键已经不存在时，删除重放为空操作。插入/替换重放按 `_id` 收敛。
@@ -96,7 +128,7 @@ MiniMongoDB 是机制模型（mechanism model），而不是兼容性实现
 - 本地日志将逻辑操作日志条目封装为
   `4-byte length | payload | 4-byte CRC32`。真实 MongoDB 使用 WiredTiger
   存储引擎日志，并将其与复制操作日志分离。
-- 在文档、`_id` 索引、sequence 或内存 oplog 条目可见之前，追加操作会刷新
+- 在文档、`_id`/二级索引、sequence 或内存 oplog 条目可见之前，追加操作会刷新
   并执行 `fsync`。失败的追加会尽力截断回原边界并抛出存储错误。不提供组提交
   （group commit）。
 - 只有无效的最终帧会通过截断到最后一个有效前缀来修复。如果后面仍有字节，

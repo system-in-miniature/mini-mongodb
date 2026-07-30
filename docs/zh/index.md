@@ -3,8 +3,9 @@
 [English](../index.md)
 
 MiniMongoDB 是一个确定性的单进程 Python 文档数据库内核，用来学习点分路径、
-数组感知匹配、更新路由、自动 `_id` 唯一性、幂等后像 oplog、CRC 分帧 journal、
-checkpoint 与启动恢复。它不是 MongoDB 兼容服务器。
+数组感知匹配、canonical multikey 索引、COLLSCAN/IXSCAN 规划、聚合管道、
+幂等后像 oplog、CRC 分帧 journal、checkpoint 与启动恢复。它不是 MongoDB
+兼容服务器。
 
 ## 安装
 
@@ -27,8 +28,8 @@ uv run python labs/lab_array_matching.py
 
 ## 阅读顺序
 
-先看仓库的端到端数据路径和目录导览，再读映射、运行三个 lab，最后通过差异章节
-把这个 M1 教学模型与生产 MongoDB 语义分开。
+先看仓库的端到端数据路径和目录导览，再读映射、运行五个 lab，最后通过差异章节
+把这个 M2 教学模型与生产 MongoDB 语义分开。
 
 完整实现范围与持久化 API 示例见
 [中文 README](https://github.com/system-in-miniature/MiniMongoDB/blob/main/README.zh-CN.md)。

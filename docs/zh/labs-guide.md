@@ -43,4 +43,29 @@ uv run python labs/lab_crash_recovery.py
 不完整的最后 journal 帧被丢弃。剩余字节数是实现细节。重点观察原子 checkpoint
 与有效 journal 帧前缀之间的恢复边界。
 
+## Multikey 索引展开
+
+源码：
+[lab_multikey_index.py](https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_multikey_index.py)
+
+```bash
+uv run python labs/lab_multikey_index.py
+```
+
+预期：`tags` 索引报告 `multikey: True`，三个文档共生成四个不同索引键；
+查询 `"database"` 返回文档 id `[1, 2]`。重点观察一个含数组的文档如何拥有
+多个 canonical 键，以及同一文档内的重复值如何去重。
+
+## 建索引前后的 explain
+
+源码：
+[lab_explain.py](https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_explain.py)
+
+```bash
+uv run python labs/lab_explain.py
+```
+
+预期：同一个选择性查询从检查四个文档的 `COLLSCAN` 变为只检查一个文档的
+`IXSCAN`。matcher 和返回结果不变；改变的只是规划器的候选来源与扫描工作量。
+
 继续阅读 [MongoDB 映射](mapping.md)和[已声明差异](DIFFERENCES.md)。

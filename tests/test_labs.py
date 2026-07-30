@@ -25,6 +25,14 @@ ROOT = Path(__file__).parents[1]
             "lab_crash_recovery.py",
             ["before injected crash", "truncated journal tail", "recovered documents"],
         ),
+        (
+            "lab_multikey_index.py",
+            ["one document", "index keys", "matched document ids"],
+        ),
+        (
+            "lab_explain.py",
+            ["before index: COLLSCAN", "after index: IXSCAN", "docs examined"],
+        ),
     ],
 )
 def test_lab_runs_as_a_script(script: str, markers: list[str]) -> None:

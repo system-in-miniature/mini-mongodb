@@ -21,13 +21,14 @@
 | `query.matcher` 顶层 `$not` | 字段级 `$not` 查询操作符 | 语义相反 | MiniMongoDB 接受项目特有的顶层逻辑 `$not`；真实 MongoDB 只支持字段操作符 `$not`，并拒绝顶层形式。 |
 | `update.operators` | MQL 更新修饰符 | 有意简化 | 替换更新与操作符更新相互分离；路径变更在单文档内具有原子性。不支持操作符选项和数组过滤器。 |
 | `index.IdIndex` | 自动创建的唯一 `_id_` 索引 | 等价 | 每个集合都会在写入可见前按带 BSON 类型的相等语义保证标识唯一。底层使用带规范标签键的 Python 哈希映射，而非 B-tree。 |
+| `index.SecondaryIndex` | 升序二级、复合、唯一和 multikey 索引 | 有意简化 | 点分字段与 `_id` 共用带 BSON 标签的 canonical 相等语义；含数组的文档拥有多个去重键。复合扫描要求最左前缀。本地有序映射不是 B-tree，也不实现降序、稀疏、部分或专用索引。 |
 | `collection.Collection` | 集合 CRUD 层 | 有意简化 | 文档会跨越复制边界，并且仅在日志条目持久化后发布。批量方法提交前缀，而不是充当多文档事务。 |
 | `oplog.OplogEntry` | 副本集 oplog 后镜像/幂等规约 | 有意简化 | 动作更新变为可安全重复的最终赋值。真实 oplog 格式和各版本专用的更新编码更为丰富。 |
 | 携带 oplog 帧的 `storage.journal` | WiredTiger 日志加副本 oplog | 语义相反 | 真实 MongoDB 将存储引擎恢复记录与复制 oplog 分离；M1 复用逻辑 oplog 条目作为本地持久化日志。 |
 | `storage.checkpoint` | WiredTiger 检查点 | 有意简化 | 重启时从快照开始，并应用更新的持久化记录。该快照是带类型标签的全数据库 JSON，没有页或 MVCC。 |
 | `storage.recovery` | 启动恢复 | 等价 | 只重放 CRC 有效的日志前缀；重复应用已经应用过的后镜像不会造成影响。 |
-| `plan` 文档字符串 | 查询规划器与 `explain` | 有意简化 | 该边界为 M2 预留；M1 不声称规划器已经存在。 |
-| `aggregate` 文档字符串 | 聚合管道执行 | 有意简化 | 该边界为 M2 预留；M1 不公开虚假的管道实现。 |
+| `plan.choose_plan` | 查询规划器与 `explain` | 有意简化 | 前缀兼容索引按候选文档所有权估计选择性；只有 IXSCAN 检查更少文档时才胜过 COLLSCAN。explain 返回 Mongo 术语的胜出 stage 与实际键/文档计数。 |
+| `aggregate.execute_pipeline` | 聚合管道执行 | 有意简化 | `$match/$project/$group/$sort/$limit` 组成文档算子流；group 支持 `$sum/$avg/$min/$max/$push`。流式与阻塞 stage 边界显式存在，但没有 MongoDB 优化器或分布式管道。 |
 | `oplog.capped` 文档字符串 | 有界 `local.oplog.rs` 保留机制 | 有意简化 | 接口方向已记录，但有界保留是明确的 M3 工作项。 |
 
 ## 一次写入如何经过这个微型系统
@@ -40,8 +41,16 @@ update_one({"_id": 1}, {"$inc": {"visits": 1}})
   → oplog prepares {"$set": {"visits": <final value>}}
   → journal appends length | payload | CRC and fsyncs
   → oplog publishes its sequence and in-memory entry
-  → collection swaps the copy and index atomically
+  → collection swaps the copy and all indexes atomically
 ```
 
 关键的所有权边界（ownership boundary）位于用户命令与持久化条目之间。
 命令说明*要尝试什么动作*；条目说明*要收敛到哪个最终状态*。
+
+## 关系算子与文档管道
+
+MiniPostgres 把针对 schema 行的 SQL 解析为计划树，Volcano 算子从子节点拉取
+tuple。MiniMongoDB 从已经成形的查询文档出发，选择 `IXSCAN` 或 `COLLSCAN`，
+再让自描述的嵌套文档依次通过聚合 stage。两者都教学算子组合与阻塞边界
+（`Sort`/`Aggregate` 对 `$sort/$group`）；只有关系侧把列绑定到 schema，
+文档侧则把点分路径与 multikey 扇出保留为运行时值语义。

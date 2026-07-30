@@ -38,3 +38,12 @@ class IdIndex:
             return canonical_key(key) in self._documents
         except TypeError:
             return False
+
+    @property
+    def has_root_array(self) -> bool:
+        """Whether scalar matcher semantics can fan out inside an ``_id``."""
+
+        return any(
+            isinstance(document["_id"], list)
+            for document in self._documents.values()
+        )

@@ -4,7 +4,7 @@
 
 MiniMongoDB is a mechanism model, not a compatibility implementation. This
 file records both the design's non-goals and smaller semantic differences
-introduced by M1.
+introduced through M2.
 
 ## Explicit non-goals
 
@@ -23,11 +23,11 @@ introduced by M1.
 
 - **M1 (implemented):** value/path semantics, CRUD, query/update subset,
   automatic `_id`, idempotent oplog, journal, checkpoint, recovery, labs.
-- **M2 (not implemented):** secondary/compound/unique indexes, selectivity,
-  IXSCAN/COLLSCAN planning, `explain`, aggregation pipeline.
+- **M2 (implemented):** secondary/compound/unique/multikey indexes,
+  prefix-aware selectivity, IXSCAN/COLLSCAN planning, `explain`, and the
+  minimum aggregation pipeline.
 - **M3 (not implemented):** capped/ring oplog retention and replication mapping
-  to MiniDist. `oplog/capped.py`, `plan/`, and `aggregate/` are documentation
-  boundaries, not working substitutes.
+  to MiniDist. Only `oplog/capped.py` remains a documentation boundary.
 
 ## BSON and identity differences
 
@@ -64,8 +64,50 @@ introduced by M1.
   null from missing; use `$exists: false` for missing.
 - There is no `$elemMatch`; multiple predicates on an array path may therefore
   be satisfied by different elements.
-- There is no projection, sort, skip, limit, cursor, collation, regex, or
-  query-planner shortcut in M1. `find` returns an eager list in insertion order.
+- `find` has no projection, sort, skip, limit, cursor, collation, or regex
+  options. It returns an eager list in insertion order, even when IXSCAN
+  narrows the candidate set. Projection/sort/limit exist only as aggregation
+  stages.
+
+## Index and planner differences
+
+- Secondary indexes are ascending-only ordered canonical maps, not B-trees.
+  Dotted fields and compound leftmost prefixes are supported; descending,
+  sparse, partial, wildcard, hashed, text, and geospatial indexes are absent.
+- Index keys use the same recursive BSON-tagged canonical form as `_id`.
+  Arrays expand recursively into per-element multikey entries and duplicate
+  keys owned by the same document are de-duplicated.
+- A compound index forms the Cartesian product when more than one indexed
+  field contains arrays. Real MongoDB rejects a compound multikey index when
+  more than one indexed field is an array in a document; this miniature keeps
+  the product visible as a teaching simplification.
+- Missing indexed fields use a null-like key. There is no sparse option, and a
+  unique index therefore permits only one document with that missing/null key.
+- Index creation validates current documents, appends a durable
+  `create_index` entry, then publishes the definition. Definitions also enter
+  checkpoints; document changes update every index only after journal success.
+- The planner has no statistics catalog, histograms, plan cache, intersection,
+  covered queries, sort satisfaction, or trial execution. It counts candidate
+  owners for prefix-compatible indexes and chooses IXSCAN only when that count
+  is smaller than the collection size.
+- Safe `_id` equality uses the automatic `_id_` IXSCAN. Because this teaching
+  model still permits a root array as `_id`, scalar predicates fall back to
+  COLLSCAN when any such id exists so matcher element-expansion cannot be lost.
+- `explain(query)` is an eager collection method rather than a cursor method.
+  It reports one winning plan and `keysExamined/docsExamined/nReturned`; it has
+  no verbosity modes, rejected plans, timing, yields, or storage metrics.
+
+## Aggregation differences
+
+- The implemented stages are only `$match/$project/$group/$sort/$limit`.
+  `$match` reuses the normal matcher; there is no pipeline rewrite or index
+  pushdown.
+- `$group` supports `_id` plus `$sum/$avg/$min/$max/$push`. Expressions are
+  constants, dotted `$field` references, or nested document/list shapes; the
+  full MongoDB expression language is absent.
+- `$match`, `$project`, and `$limit` stream. `$group` and `$sort` materialize
+  input in memory. There is no spilling, parallelism, distributed merge,
+  `$lookup`, `$unwind`, window functions, or optimizer.
 
 ## Update and CRUD differences
 
@@ -92,7 +134,8 @@ introduced by M1.
 
 ## Oplog differences
 
-- M1 emits one entry per affected document, not a byte-compatible MongoDB oplog
+- MiniMongoDB emits one entry per affected document (plus index-definition
+  entries), not a byte-compatible MongoDB oplog
   record.
 - Insert/replace records carry a full document. Update records carry `$set` and
   `$unset` post-images for every requested path; `$inc`, `$push`, and `$pull`
@@ -108,8 +151,8 @@ introduced by M1.
 - The local journal frames logical oplog entries as
   `4-byte length | payload | 4-byte CRC32`. Real MongoDB uses WiredTiger's
   storage-engine journal separately from the replication oplog.
-- Appends flush and `fsync` before the document, `_id` index, sequence, or
-  in-memory oplog entry becomes visible. A failed append is best-effort
+- Appends flush and `fsync` before the document, `_id`/secondary indexes,
+  sequence, or in-memory oplog entry becomes visible. A failed append is best-effort
   truncated back to its prior boundary and the storage error is raised. There
   is no group commit.
 - Only an invalid final frame is repaired by truncating to the last valid

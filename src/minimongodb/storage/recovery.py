@@ -15,6 +15,7 @@ from minimongodb.storage.journal import Journal
 class RecoveryState:
     checkpoint_sequence: int
     collections: dict[str, list[dict[str, Any]]]
+    indexes: dict[str, list[dict[str, Any]]]
     journal_entries: list[OplogEntry]
 
 
@@ -25,9 +26,11 @@ def load_recovery_state(directory: str | Path) -> RecoveryState:
     checkpoint = read_checkpoint(root / "checkpoint.bin") or {
         "sequence": 0,
         "collections": {},
+        "indexes": {},
     }
     return RecoveryState(
         checkpoint_sequence=checkpoint["sequence"],
         collections=checkpoint["collections"],
+        indexes=checkpoint.get("indexes", {}),
         journal_entries=Journal(root / "journal.bin").read_entries(repair=True),
     )

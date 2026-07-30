@@ -51,6 +51,7 @@ class Database:
             listener=self._journal.append,
         )
         names = set(recovery.collections)
+        names.update(recovery.indexes)
         names.update(entry.collection for entry in recovery.journal_entries)
         self._collections = {
             name: Collection(
@@ -66,6 +67,10 @@ class Database:
                 collection._apply_oplog_entry(
                     OplogEntry(0, name, "insert", document["_id"], document)
                 )
+        for name, definitions in recovery.indexes.items():
+            collection = self._collections[name]
+            for definition in definitions:
+                collection._restore_index(definition)
         replay(
             recovery.journal_entries,
             self._collections,
@@ -93,6 +98,10 @@ class Database:
                 "sequence": self.oplog.last_sequence,
                 "collections": {
                     name: collection.find()
+                    for name, collection in sorted(self._collections.items())
+                },
+                "indexes": {
+                    name: collection._index_definitions()
                     for name, collection in sorted(self._collections.items())
                 },
             },

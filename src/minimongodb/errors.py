@@ -21,6 +21,10 @@ class InvalidUpdateError(MiniMongoError):
     """Raised for malformed updates or incompatible operand types."""
 
 
+class InvalidPipelineError(MiniMongoError):
+    """Raised for malformed or unsupported aggregation pipeline stages."""
+
+
 class PathError(MiniMongoError):
     """Raised when a dotted path cannot traverse the current container."""
 

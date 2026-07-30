@@ -25,13 +25,19 @@ nav:
       - Chapter 1 · Quick start: index.md
       - Chapter 2 · Architecture overview: https://github.com/system-in-miniature/mini-mongodb#directory-guide
       - Chapter 3 · Mechanisms and MongoDB mapping: mapping.md
-      - Chapter 4 · Hands-on experiments: labs-guide.md
+      - Chapter 4 · Hands-on experiments:
+          - Lab guide: labs-guide.md
+          - Lab · Multikey index: https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_multikey_index.py
+          - Lab · Explain comparison: https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_explain.py
       - Chapter 5 · Differences from MongoDB: DIFFERENCES.md
   - 中文版:
       - 第 1 章 · 快速开始: zh/index.md
       - 第 2 章 · 架构总览: https://github.com/system-in-miniature/mini-mongodb/blob/main/README.zh-CN.md
       - 第 3 章 · 机制与 MongoDB 映射: zh/mapping.md
-      - 第 4 章 · 动手实验: zh/labs-guide.md
+      - 第 4 章 · 动手实验:
+          - 实验指南: zh/labs-guide.md
+          - Lab · Multikey 索引: https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_multikey_index.py
+          - Lab · Explain 对比: https://github.com/system-in-miniature/mini-mongodb/blob/main/labs/lab_explain.py
       - 第 5 章 · 与 MongoDB 的差异: zh/DIFFERENCES.md
   - Design history archive · 设计历史存档:
       - Archive notice · 存档说明: superpowers/README.md

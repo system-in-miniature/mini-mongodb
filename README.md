@@ -9,14 +9,15 @@ single-process document database kernel written in Python. It is a teaching
 model, not a MongoDB-compatible server—there is no wire protocol, JavaScript
 shell, replica set, or claim of complete BSON/MQL compatibility.
 
-The M1 data path is small enough to inspect end to end:
+The M2 data path is small enough to inspect end to end:
 
 ```text
 Python dict/list document
 → dotted-path resolver
 → query matcher (including array element matching)
 → update or replacement routing
-→ automatic unique _id index
+→ automatic _id plus secondary/compound multikey indexes
+→ COLLSCAN/IXSCAN planner and explain counters
 → idempotent post-image oplog
 → CRC journal + checkpoint
 → startup recovery
@@ -53,6 +54,8 @@ uv run pytest -q
 uv run python labs/lab_array_matching.py
 uv run python labs/lab_oplog_idempotent.py
 uv run python labs/lab_crash_recovery.py
+uv run python labs/lab_multikey_index.py
+uv run python labs/lab_explain.py
 ```
 
 Persistent use starts with an explicit directory:
@@ -73,7 +76,7 @@ print(restarted["users"].find())
 All returned documents are copies. The database owns its stored values, so a
 caller cannot mutate persistence by changing a result dictionary.
 
-## Implemented in M1
+## Implemented through M2
 
 - nested dict/list values, deterministic counter-backed `ObjectId`, explicit
   type tags and a documented simplified cross-type order;
@@ -84,15 +87,21 @@ caller cannot mutate persistence by changing a result dictionary.
 - scalar predicates that automatically inspect stored array elements;
 - `$set/$unset/$inc/$push/$pull` and immutable `_id`;
 - automatic unique `_id` index and duplicate-key failure;
+- single-field and compound ascending indexes over dotted paths, canonical
+  BSON-tagged keys, multikey array expansion, and optional uniqueness;
+- deterministic prefix-aware COLLSCAN/IXSCAN selection and `explain` execution
+  counts;
+- `$match/$project/$group/$sort/$limit` pipelines, including
+  `$sum/$avg/$min/$max/$push` group accumulators;
 - per-document oplog entries that rewrite action updates to final `$set`
   post-images, plus idempotent replay;
 - length+CRC journal frames, final-tail repair, atomic checkpoint snapshots,
   and checkpoint-plus-journal startup recovery.
 
-M2 secondary/compound indexes, planning, `explain`, and aggregation are not
-implemented. M3 capped oplog retention and replication mapping are not
-implemented. Their package boundaries exist as planning docstrings so later
-milestones extend the architecture instead of replacing toy modules.
+M3 capped oplog retention and replication mapping are not implemented. Index
+definitions are journaled and checkpointed; document writes still publish the
+document, `_id` index, and all secondary entries only after the journal append
+succeeds.
 
 ## Directory guide
 
@@ -101,14 +110,14 @@ src/minimongodb/
   bson/        values, ObjectId, exact equality, ordering, dotted paths
   query/       logical operators and array-aware matching
   update/      replacement routing and update operators
-  index/       M1 unique _id index
+  index/       unique _id plus canonical compound/multikey indexes
   oplog/       post-image entries and idempotent replay; capped.py is M3
   storage/     tagged codec, CRC journal, checkpoint, recovery inputs
-  plan/        M2 planning boundary only
-  aggregate/   M2 pipeline boundary only
+  plan/        selectivity estimate, COLLSCAN/IXSCAN choice, explain plan
+  aggregate/   match/project/group/sort/limit operator pipeline
   collection.py
   database.py
-labs/          three executable, public-API experiments
+labs/          five executable, public-API experiments
 tests/         mechanism-focused tests, including crash boundaries
 docs/          real-system mapping and declared differences
 ```
@@ -122,17 +131,18 @@ models:
 |---|---|---|
 | What is stored? | schema-typed rows in relations | self-shaped nested documents |
 | How is a field selected? | bound column reference | dotted path with array traversal |
-| How is a query expressed? | parsed SQL → plan tree | query document → recursive matcher |
+| How is a query expressed? | parsed SQL → plan tree | query document → matcher + IXSCAN/COLLSCAN plan |
 | How is data changed? | row-oriented DML expressions | replacement or path update operators |
 | What is identity? | declared PK/UNIQUE indexes | mandatory automatic `_id` index |
 | What is the durable log? | physical/page-aware WAL | framed idempotent logical post-images |
 | What is the key surprise? | NULL and three-valued logic | array auto-match vs exact document |
 
 MiniPostgres is best followed top-down from SQL parsing through planning and the
-Volcano executor. MiniMongoDB M1 is best followed inside-out: start at BSON
-value/path semantics, then the matcher, then collection writes, and finally the
-oplog/journal recovery chain. M2 will make the planning and aggregation
-comparison more symmetrical.
+Volcano executor. MiniMongoDB is best followed inside-out: BSON value/path
+semantics feed the matcher and canonical multikey indexes, then the planner
+chooses a Mongo-named scan, and aggregation composes document operators as a
+pipeline. Both projects expose planning and operator flow, but one transforms
+schema-bound rows while the other preserves self-shaped nested documents.
 
 See [concept mapping](docs/mapping.md) and
 [declared differences](docs/DIFFERENCES.md) before treating a successful lab as
