@@ -15,6 +15,9 @@ theme:
     - navigation.top
     - content.code.copy
 
+extra_javascript:
+  - assets/javascripts/language-switch.js
+
 markdown_extensions:
   - admonition
   - attr_list
@@ -37,6 +40,18 @@ nav:
           - 08 · Planning and Explain: tutorial/08-planner-explain.md
           - 09 · Aggregation Pipelines: tutorial/09-aggregation.md
           - 10 · Relational versus Document: tutorial/10-relational-vs-document.md
+      - Self-Guided Rebuild:
+          - Build MiniMongoDB yourself: journey/index.md
+          - "01 · BSON values and dotted paths": journey/stage-01.md
+          - "02 · Array-aware query matching": journey/stage-02.md
+          - "03 · Durable oplog frames": journey/stage-03.md
+          - "04 · CRUD, updates, and recovery": journey/stage-04.md
+          - "05 · Journal-first identity boundary": journey/stage-05.md
+          - "06 · Indexed plans and aggregation pipelines": journey/stage-06.md
+          - "07 · Query validation before planning": journey/stage-07.md
+          - "08 · Executable domain experiments": journey/stage-08.md
+      - Agent-Guided Rebuild:
+          - CLI usage: agent-guide.md
       - Reference:
           - Architecture and source guide: https://github.com/system-in-miniature/mini-mongodb#directory-guide
           - Mechanism mapping: mapping.md
@@ -48,6 +63,8 @@ nav:
               - M2 implementation plan: superpowers/plans/2026-07-30-minimongodb-m2.md
               - Final-audit design: superpowers/specs/2026-07-30-final-audit-correctness-design.md
               - Final-audit plan: superpowers/plans/2026-07-30-final-audit-correctness.md
+              - Polished Journey design: superpowers/specs/2026-08-01-polished-journey-design.md
+              - Polished Journey plan: superpowers/plans/2026-08-01-polished-journey.md
   - 简体中文:
       - 教程:
           - 全书目录: zh/index.md
@@ -61,6 +78,18 @@ nav:
           - 08 · 规划与 Explain: zh/tutorial/08-planner-explain.md
           - 09 · 聚合管道: zh/tutorial/09-aggregation.md
           - 10 · 关系模型与文档模型: zh/tutorial/10-relational-vs-document.md
+      - 自主重建:
+          - 从零构建 MiniMongoDB: zh/journey/index.md
+          - "01 · BSON 值与点路径": zh/journey/stage-01.md
+          - "02 · 数组感知的查询匹配": zh/journey/stage-02.md
+          - "03 · 持久化 Oplog 帧": zh/journey/stage-03.md
+          - "04 · CRUD、更新与恢复闭环": zh/journey/stage-04.md
+          - "05 · 日志优先与身份边界": zh/journey/stage-05.md
+          - "06 · 索引计划与聚合管道": zh/journey/stage-06.md
+          - "07 · 规划前的查询校验": zh/journey/stage-07.md
+          - "08 · 可执行领域实验": zh/journey/stage-08.md
+      - Agent 带教:
+          - CLI 使用教程: zh/agent-guide.md
       - 参考资料:
           - 架构与源码导览: https://github.com/system-in-miniature/mini-mongodb/blob/main/README.zh-CN.md
           - 机制映射: zh/mapping.md

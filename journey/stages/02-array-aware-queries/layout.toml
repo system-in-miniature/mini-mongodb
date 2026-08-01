@@ -1,0 +1,18 @@
+failure_files = ["tests/test_array_matching.py", "tests/test_query.py"]
+
+[[blocks]]
+id = "mechanism"
+title_en = "Array-aware query matching mechanism"
+title_zh = "数组感知的查询匹配机制"
+summary_en = "The matcher resolves candidate values, applies field operators to them, and combines logical clauses without mutating the document."
+summary_zh = "Matcher 解析候选值、对它们应用字段算子，再组合逻辑子句，全程不修改文档。"
+files = ["src/minimongodb/query/matcher.py"]
+
+[[blocks]]
+id = "supporting"
+title_en = "Package, fixture, and project support"
+title_zh = "包、Fixture 与工程支撑"
+summary_en = "Keep exports, test corpora, dependencies, and the runtime environment reproducible."
+summary_zh = "保持包导出、测试语料、依赖与运行环境可复现。"
+files = ["src/minimongodb/query/__init__.py"]
+supporting = true

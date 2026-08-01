@@ -1,0 +1,18 @@
+failure_files = ["tests/test_crud.py", "tests/test_oplog.py", "tests/test_recovery.py", "tests/test_storage.py"]
+
+[[blocks]]
+id = "mechanism"
+title_en = "Journal-first identity boundary mechanism"
+title_zh = "日志优先与身份边界机制"
+summary_en = "The collection prepares new state without exposing it, appends and syncs the oplog entry, then mutates documents and indexes; failure leaves the prior visible state."
+summary_zh = "Collection 先准备但不暴露新状态，Append 并同步 Oplog Entry，最后修改文档与索引；失败时保留旧可见状态。"
+files = ["src/minimongodb/bson/types.py", "src/minimongodb/collection.py", "src/minimongodb/index/id_index.py", "src/minimongodb/oplog/entry.py", "src/minimongodb/storage/checkpoint.py", "src/minimongodb/storage/journal.py"]
+
+[[blocks]]
+id = "supporting"
+title_en = "Package, fixture, and project support"
+title_zh = "包、Fixture 与工程支撑"
+summary_en = "Keep exports, test corpora, dependencies, and the runtime environment reproducible."
+summary_zh = "保持包导出、测试语料、依赖与运行环境可复现。"
+files = ["src/minimongodb/bson/__init__.py"]
+supporting = true

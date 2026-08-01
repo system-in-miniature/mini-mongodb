@@ -1,0 +1,18 @@
+failure_files = ["tests/test_aggregate.py", "tests/test_indexes.py", "tests/test_planner.py"]
+
+[[blocks]]
+id = "mechanism"
+title_en = "Indexed plans and aggregation pipelines mechanism"
+title_zh = "索引计划与聚合管道机制"
+summary_en = "Writes stage all index entries before publication; reads fetch and recheck planned candidates; aggregation then threads owned documents through each validated stage."
+summary_zh = "写入在发布前暂存全部索引项；读取取回并重检计划候选；随后聚合把受控文档依次传过每个已校验 Stage。"
+files = ["src/minimongodb/aggregate/__init__.py", "src/minimongodb/collection.py", "src/minimongodb/database.py", "src/minimongodb/errors.py", "src/minimongodb/index/id_index.py", "src/minimongodb/index/secondary.py", "src/minimongodb/plan/__init__.py", "src/minimongodb/storage/recovery.py"]
+
+[[blocks]]
+id = "supporting"
+title_en = "Package, fixture, and project support"
+title_zh = "包、Fixture 与工程支撑"
+summary_en = "Keep exports, test corpora, dependencies, and the runtime environment reproducible."
+summary_zh = "保持包导出、测试语料、依赖与运行环境可复现。"
+files = ["src/minimongodb/index/__init__.py"]
+supporting = true

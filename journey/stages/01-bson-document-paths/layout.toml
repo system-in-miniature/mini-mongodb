@@ -1,0 +1,18 @@
+failure_files = ["tests/test_bson.py"]
+
+[[blocks]]
+id = "mechanism"
+title_en = "BSON values and dotted paths mechanism"
+title_zh = "BSON 值与点路径机制"
+summary_en = "Values are validated and copied at the boundary; path traversal then walks mappings and numeric list positions without leaking caller-owned state."
+summary_zh = "值在边界被校验和复制；随后路径遍历只沿 Mapping 与数字数组下标前进，不泄漏调用方状态。"
+files = ["src/minimongodb/bson/path.py", "src/minimongodb/bson/types.py", "src/minimongodb/errors.py"]
+
+[[blocks]]
+id = "supporting"
+title_en = "Package, fixture, and project support"
+title_zh = "包、Fixture 与工程支撑"
+summary_en = "Keep exports, test corpora, dependencies, and the runtime environment reproducible."
+summary_zh = "保持包导出、测试语料、依赖与运行环境可复现。"
+files = ["pyproject.toml", "src/minimongodb/bson/__init__.py", "uv.lock"]
+supporting = true

@@ -1,0 +1,169 @@
+[project]
+name = "MiniMongoDB"
+package = "minimongodb"
+repository_url = "https://github.com/system-in-miniature/mini-mongodb"
+owned_roots = ["src/minimongodb", "labs"]
+owned_files = [
+  "pyproject.toml",
+  "uv.lock",
+  "tests/test_aggregate.py",
+  "tests/test_array_matching.py",
+  "tests/test_bson.py",
+  "tests/test_crud.py",
+  "tests/test_indexes.py",
+  "tests/test_labs.py",
+  "tests/test_oplog.py",
+  "tests/test_planner.py",
+  "tests/test_query.py",
+  "tests/test_recovery.py",
+  "tests/test_storage.py",
+  "tests/test_update.py",
+]
+
+[[stages]]
+number = 1
+slug = "bson-document-paths"
+chapter = 2
+source = "136f8ea"
+files = [
+  "pyproject.toml",
+  "uv.lock",
+  "src/minimongodb/errors.py",
+  "src/minimongodb/bson/__init__.py",
+  "src/minimongodb/bson/path.py",
+  "src/minimongodb/bson/types.py",
+  "tests/test_bson.py",
+]
+tests = ["tests/test_bson.py"]
+
+[[stages]]
+number = 2
+slug = "array-aware-queries"
+chapter = 3
+source = "136f8ea"
+files = [
+  "src/minimongodb/query/__init__.py",
+  "src/minimongodb/query/matcher.py",
+  "tests/test_query.py",
+  "tests/test_array_matching.py",
+]
+tests = ["tests/test_query.py", "tests/test_array_matching.py"]
+
+[[stages]]
+number = 3
+slug = "durable-log-frames"
+chapter = 5
+source = "136f8ea"
+files = [
+  "src/minimongodb/oplog/__init__.py",
+  "src/minimongodb/oplog/capped.py",
+  "src/minimongodb/oplog/entry.py",
+  "src/minimongodb/storage/__init__.py",
+  "src/minimongodb/storage/checkpoint.py",
+  "src/minimongodb/storage/codec.py",
+  "src/minimongodb/storage/journal.py",
+  "src/minimongodb/storage/recovery.py",
+  "tests/test_storage.py",
+]
+tests = ["tests/test_storage.py"]
+
+[[stages]]
+number = 4
+slug = "crud-update-recovery"
+chapter = 6
+source = "136f8ea"
+files = [
+  "src/minimongodb/__init__.py",
+  "src/minimongodb/aggregate/__init__.py",
+  "src/minimongodb/collection.py",
+  "src/minimongodb/database.py",
+  "src/minimongodb/index/__init__.py",
+  "src/minimongodb/index/id_index.py",
+  "src/minimongodb/oplog/replay.py",
+  "src/minimongodb/plan/__init__.py",
+  "src/minimongodb/update/__init__.py",
+  "src/minimongodb/update/operators.py",
+  "tests/test_crud.py",
+  "tests/test_oplog.py",
+  "tests/test_recovery.py",
+  "tests/test_update.py",
+]
+tests = [
+  "tests/test_crud.py",
+  "tests/test_update.py",
+  "tests/test_oplog.py",
+  "tests/test_recovery.py",
+]
+
+[[stages]]
+number = 5
+slug = "journal-first-identity"
+chapter = 5
+source = "4365a53"
+files = [
+  "src/minimongodb/bson/__init__.py",
+  "src/minimongodb/bson/types.py",
+  "src/minimongodb/collection.py",
+  "src/minimongodb/index/id_index.py",
+  "src/minimongodb/oplog/entry.py",
+  "src/minimongodb/storage/checkpoint.py",
+  "src/minimongodb/storage/journal.py",
+  "tests/test_crud.py",
+  "tests/test_oplog.py",
+  "tests/test_recovery.py",
+  "tests/test_storage.py",
+]
+tests = [
+  "tests/test_crud.py",
+  "tests/test_oplog.py",
+  "tests/test_recovery.py",
+  "tests/test_storage.py",
+]
+
+[[stages]]
+number = 6
+slug = "indexes-plans-pipelines"
+chapter = 8
+source = "da37381"
+files = [
+  "src/minimongodb/aggregate/__init__.py",
+  "src/minimongodb/collection.py",
+  "src/minimongodb/database.py",
+  "src/minimongodb/errors.py",
+  "src/minimongodb/index/__init__.py",
+  "src/minimongodb/index/id_index.py",
+  "src/minimongodb/index/secondary.py",
+  "src/minimongodb/plan/__init__.py",
+  "src/minimongodb/storage/recovery.py",
+  "tests/test_indexes.py",
+  "tests/test_planner.py",
+  "tests/test_aggregate.py",
+]
+tests = ["tests/test_indexes.py", "tests/test_planner.py", "tests/test_aggregate.py"]
+
+[[stages]]
+number = 7
+slug = "query-validation-regression"
+chapter = 3
+source = "d91ce67"
+files = [
+  "src/minimongodb/query/__init__.py",
+  "src/minimongodb/query/matcher.py",
+  "tests/test_query.py",
+]
+tests = ["tests/test_query.py"]
+
+[[stages]]
+number = 8
+slug = "executable-domain-labs"
+chapter = 10
+source = "HEAD"
+files = [
+  "labs/lab_array_matching.py",
+  "labs/lab_crash_recovery.py",
+  "labs/lab_explain.py",
+  "labs/lab_multikey_index.py",
+  "labs/lab_oplog_idempotent.py",
+  "tests/test_labs.py",
+]
+tests = ["tests/test_labs.py"]

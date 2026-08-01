@@ -14,20 +14,16 @@ pretending that each commit was already a lesson. Every Stage is still derived
 from an exact Git revision and the cumulative final Stage must byte-match the
 canonical owned source, labs, tests, and project metadata.
 
-The twelve dependency-ordered Stages are:
+The eight dependency-ordered Stages are:
 
 1. BSON value and dotted-path contract
 2. Array-aware query matching
-3. Update and replacement semantics
-4. Oplog value objects
-5. Durable storage frames
-6. Collection, database, and recovery loop
-7. Journal-first ordering and canonical identity regressions
-8. Secondary and multikey indexes
-9. Planner and explain counters
-10. Aggregation pipelines
-11. Empty-collection query validation regression
-12. Executable labs and domain closure
+3. Durable oplog and storage frames
+4. Collection, update, oplog replay, and recovery loop
+5. Journal-first ordering and canonical identity regressions
+6. Secondary indexes, planning, explain, and aggregation pipelines
+7. Empty-collection query validation regression
+8. Executable labs and domain closure
 
 ## Lesson contract
 
@@ -46,7 +42,7 @@ explain what the code is, its runtime role, and the critical statement.
 ## Learning modes
 
 - Mechanism Tutorial: the existing chapter-oriented book.
-- Self-Guided Rebuild: twelve independent browser lessons with collapsed diffs.
+- Self-Guided Rebuild: eight independent browser lessons with collapsed diffs.
 - Agent-Guided Rebuild: a concise usage page and `AGENTS.md`; the command creates
   or resumes a marked Stage-specific workspace from the canonical repository.
 
@@ -56,7 +52,7 @@ the source of truth.
 
 ## Verification
 
-Acceptance requires the existing suite, Journey tool tests, all twelve focused
+Acceptance requires the existing suite, Journey tool tests, all eight focused
 Stage checks, cumulative owned-tree parity, Python compilation, strict MkDocs
 build, and browser checks for both languages, collapsed diffs, section order,
 same-Stage language switching, the three-mode home, and Agent guide routes.

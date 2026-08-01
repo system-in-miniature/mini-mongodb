@@ -1,0 +1,671 @@
+# Stage 01 · BSON values and dotted paths
+
+### Goal
+
+Build bson values and dotted paths and explain its boundary from an executable counterexample, runtime state, and the critical statement.
+
+??? note "Deliverable files"
+    - `pyproject.toml`
+    - `src/minimongodb/bson/__init__.py`
+    - `src/minimongodb/bson/path.py`
+    - `src/minimongodb/bson/types.py`
+    - `src/minimongodb/errors.py`
+    - `tests/test_bson.py`
+    - `uv.lock`
+
+### The problem at this point
+
+A document store cannot compare, copy, identify, or traverse arbitrary Python values without a closed value contract.
+
+### Test contract
+
+#### See the failure first
+
+The tests use nested aliases, unsupported values, ordered documents, mixed numeric identities, and invalid list paths to expose accidental Python semantics.
+
+??? note "File diff: tests/test_bson.py"
+    ```diff
+    diff --git a/tests/test_bson.py b/tests/test_bson.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..ac7f9309d928051f94bbc459924fa3d02ee1b99c
+    --- /dev/null
+    +++ b/tests/test_bson.py
+    @@ -0,0 +1,75 @@
+    +"""Executable contract for MiniMongoDB's deliberately small BSON model."""
+    +
+    +import pytest
+    +
+    +from minimongodb.bson import (
+    +    MISSING,
+    +    CounterObjectIdGenerator,
+    +    ObjectId,
+    +    bson_compare,
+    +    clone_document,
+    +    get_path,
+    +    set_path,
+    +    type_tag,
+    +    unset_path,
+    +)
+    +from minimongodb.errors import PathError
+    +
+    +
+    +def test_object_ids_come_only_from_the_injected_counter() -> None:
+    +    generator = CounterObjectIdGenerator(start=40)
+    +    assert generator() == ObjectId(40)
+    +    assert generator() == ObjectId(41)
+    +    assert str(ObjectId(41)) == "000000000000000000000029"
+    +
+    +
+    +def test_type_tags_and_simplified_cross_type_order_are_explicit() -> None:
+    +    values = [None, 1, "a", {"a": 1}, [1], False, ObjectId(1)]
+    +    assert [type_tag(value) for value in values] == [
+    +        "null",
+    +        "number",
+    +        "string",
+    +        "document",
+    +        "array",
+    +        "bool",
+    +        "objectId",
+    +    ]
+    +    assert all(bson_compare(left, right) < 0 for left, right in zip(values, values[1:]))
+    +
+    +
+    +def test_clone_document_breaks_nested_aliases() -> None:
+    +    original = {"nested": {"items": [1]}}
+    +    copied = clone_document(original)
+    +    copied["nested"]["items"].append(2)
+    +    assert original == {"nested": {"items": [1]}}
+    +
+    +
+    +def test_document_validation_rejects_unsupported_nested_values() -> None:
+    +    with pytest.raises(TypeError, match="unsupported BSON value"):
+    +        clone_document({"nested": {"not_bson": {1, 2}}})
+    +
+    +
+    +def test_exact_document_equality_preserves_field_order() -> None:
+    +    from minimongodb.bson import bson_equal
+    +
+    +    assert not bson_equal({"a": 1, "b": 2}, {"b": 2, "a": 1})
+    +
+    +
+    +def test_dotted_paths_read_write_and_unset_array_indexes() -> None:
+    +    document = {"profile": {"names": [{"first": "Ada"}]}}
+    +    assert get_path(document, "profile.names.0.first") == "Ada"
+    +    assert get_path(document, "profile.missing") is MISSING
+    +
+    +    set_path(document, "profile.names.0.first", "Grace")
+    +    set_path(document, "profile.city", "London")
+    +    assert document["profile"] == {
+    +        "names": [{"first": "Grace"}],
+    +        "city": "London",
+    +    }
+    +    assert unset_path(document, "profile.names.0.first") is True
+    +    assert get_path(document, "profile.names.0.first") is MISSING
+    +
+    +
+    +def test_path_writer_rejects_non_numeric_list_segments() -> None:
+    +    with pytest.raises(PathError):
+    +        set_path({"items": [1]}, "items.name", "bad")
+    ```
+
+**What this test locks**
+
+These tests lock the Stage's happy path, boundary conditions, visible failures, and recovery invariants.
+
+**How it constructs the counterexample**
+
+The tests use nested aliases, unsupported values, ordered documents, mixed numeric identities, and invalid list paths to expose accidental Python semantics.
+
+**Key test statement**
+
+```python
+assert generator() == ObjectId(40)
+```
+
+This assertion binds the observable result to the Stage's state, visibility, or durability boundary rather than merely checking that a call returned.
+
+**What a failure means**
+
+A failure means the implementation crossed the semantic, ordering, ownership, or recovery boundary just introduced.
+
+### Basic concepts
+
+MiniMongoDB's BSON subset defines owned document copies, explicit type tags, exact equality, total ordering, ObjectId generation, and dotted reads or writes.
+
+### Why this mechanism is necessary
+
+A document store cannot compare, copy, identify, or traverse arbitrary Python values without a closed value contract. Without an explicit boundary, every later mechanism would depend on accidental behavior.
+
+### Runtime mental model
+
+Values are validated and copied at the boundary; path traversal then walks mappings and numeric list positions without leaking caller-owned state.
+
+### Mechanism blocks
+
+#### BSON values and dotted paths mechanism
+
+Values are validated and copied at the boundary; path traversal then walks mappings and numeric list positions without leaking caller-owned state.
+
+??? note "File diff: src/minimongodb/bson/path.py"
+    ```diff
+    diff --git a/src/minimongodb/bson/path.py b/src/minimongodb/bson/path.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..80883c29839dea4e3e1a32844e00b0561ee6ed99
+    --- /dev/null
+    +++ b/src/minimongodb/bson/path.py
+    @@ -0,0 +1,105 @@
+    +"""Dotted-path primitives shared by querying and updating.
+    +
+    +Numeric segments address list elements (``items.0.name``).  Writers create
+    +missing dictionary containers, but never guess how large an array should be;
+    +that explicit restriction prevents surprising sparse-list behavior.
+    +"""
+    +
+    +from __future__ import annotations
+    +
+    +from typing import Any
+    +
+    +from minimongodb.errors import PathError
+    +
+    +
+    +class _Missing:
+    +    def __repr__(self) -> str:
+    +        return "MISSING"
+    +
+    +
+    +MISSING = _Missing()
+    +
+    +
+    +def _parts(path: str) -> list[str]:
+    +    if not isinstance(path, str) or not path or any(not part for part in path.split(".")):
+    +        raise PathError("path must contain non-empty dot-separated segments")
+    +    return path.split(".")
+    +
+    +
+    +def get_path(document: Any, path: str) -> Any:
+    +    """Read one exact path; query fan-out over arrays lives in ``query``."""
+    +
+    +    current = document
+    +    for part in _parts(path):
+    +        if isinstance(current, dict):
+    +            if part not in current:
+    +                return MISSING
+    +            current = current[part]
+    +        elif isinstance(current, list):
+    +            if not part.isdigit():
+    +                return MISSING
+    +            index = int(part)
+    +            if index >= len(current):
+    +                return MISSING
+    +            current = current[index]
+    +        else:
+    +            return MISSING
+    +    return current
+    +
+    +
+    +def set_path(document: dict[str, Any], path: str, value: Any) -> None:
+    +    """Set a path, creating only unambiguous missing dictionary containers."""
+    +
+    +    parts = _parts(path)
+    +    current: Any = document
+    +    for index, part in enumerate(parts[:-1]):
+    +        next_part = parts[index + 1]
+    +        if isinstance(current, dict):
+    +            if part not in current:
+    +                # A numeric next segment signals an array, but inventing its
+    +                # length would be ambiguous, so only dictionaries are created.
+    +                if next_part.isdigit():
+    +                    raise PathError("cannot create a missing array implicitly")
+    +                current[part] = {}
+    +            current = current[part]
+    +        elif isinstance(current, list):
+    +            if not part.isdigit():
+    +                raise PathError(f"list segment must be numeric: {part!r}")
+    +            position = int(part)
+    +            if position >= len(current):
+    +                raise PathError("array index is out of range")
+    +            current = current[position]
+    +        else:
+    +            raise PathError(f"cannot traverse scalar at segment {part!r}")
+    +
+    +    final = parts[-1]
+    +    if isinstance(current, dict):
+    +        current[final] = value
+    +    elif isinstance(current, list):
+    +        if not final.isdigit():
+    +            raise PathError(f"list segment must be numeric: {final!r}")
+    +        position = int(final)
+    +        if position >= len(current):
+    +            raise PathError("array index is out of range")
+    +        current[position] = value
+    +    else:
+    +        raise PathError("cannot set a child of a scalar")
+    +
+    +
+    +def unset_path(document: dict[str, Any], path: str) -> bool:
+    +    """Remove a mapping key; array positions become ``None`` rather than shift."""
+    +
+    +    parts = _parts(path)
+    +    parent = get_path(document, ".".join(parts[:-1])) if len(parts) > 1 else document
+    +    if parent is MISSING:
+    +        return False
+    +    final = parts[-1]
+    +    if isinstance(parent, dict):
+    +        return parent.pop(final, MISSING) is not MISSING
+    +    if isinstance(parent, list) and final.isdigit():
+    +        position = int(final)
+    +        if position < len(parent):
+    +            # MongoDB's $unset on an array index preserves indices with null.
+    +            parent[position] = None
+    +            return True
+    +    return False
+    ```
+
+??? note "File diff: src/minimongodb/bson/types.py"
+    ```diff
+    diff --git a/src/minimongodb/bson/types.py b/src/minimongodb/bson/types.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..be1cb0391e3f6015d55a9d2727002de96c0f434b
+    --- /dev/null
+    +++ b/src/minimongodb/bson/types.py
+    @@ -0,0 +1,168 @@
+    +"""A JSON-shaped BSON value model with explicit teaching-only type ordering.
+    +
+    +Real BSON is a binary format with more types and a different comparison order.
+    +MiniMongoDB stores ordinary Python dictionaries/lists and adds only an
+    +``ObjectId`` analogue.  The deliberately small cross-type order is:
+    +
+    +``null < number < string < document < array < bool < objectId``.
+    +
+    +Notably, Python's ``bool`` is kept out of ``number`` even though ``bool`` is an
+    +``int`` subclass.  Comparisons recurse deterministically through documents in
+    +insertion order and arrays by element, which is useful for teaching but is not
+    +a byte-for-byte reproduction of MongoDB's BSON comparator.
+    +"""
+    +
+    +from __future__ import annotations
+    +
+    +from copy import deepcopy
+    +from dataclasses import dataclass
+    +from functools import total_ordering
+    +from itertools import count
+    +from math import isnan
+    +from typing import Any
+    +
+    +
+    +@total_ordering
+    +@dataclass(frozen=True, slots=True)
+    +class ObjectId:
+    +    """Deterministic ObjectId analogue backed by a non-negative counter."""
+    +
+    +    value: int
+    +
+    +    def __post_init__(self) -> None:
+    +        if isinstance(self.value, bool) or not isinstance(self.value, int):
+    +            raise TypeError("ObjectId value must be an integer")
+    +        if not 0 <= self.value < 2**96:
+    +            raise ValueError("ObjectId value must fit in 12 bytes")
+    +
+    +    def __str__(self) -> str:
+    +        return f"{self.value:024x}"
+    +
+    +    def __repr__(self) -> str:
+    +        return f"ObjectId('{self}')"
+    +
+    +    def __lt__(self, other: object) -> bool:
+    +        if not isinstance(other, ObjectId):
+    +            return NotImplemented
+    +        return self.value < other.value
+    +
+    +
+    +class CounterObjectIdGenerator:
+    +    """Callable ID source; injection makes every test and lab reproducible."""
+    +
+    +    def __init__(self, start: int = 1) -> None:
+    +        self._counter = count(start)
+    +
+    +    def __call__(self) -> ObjectId:
+    +        return ObjectId(next(self._counter))
+    +
+    +
+    +_TYPE_ORDER = {
+    +    "null": 0,
+    +    "number": 1,
+    +    "string": 2,
+    +    "document": 3,
+    +    "array": 4,
+    +    "bool": 5,
+    +    "objectId": 6,
+    +}
+    +
+    +
+    +def type_tag(value: Any) -> str:
+    +    """Return the supported BSON-like tag or reject an ambiguous value."""
+    +
+    +    if value is None:
+    +        return "null"
+    +    if isinstance(value, bool):
+    +        return "bool"
+    +    if isinstance(value, (int, float)):
+    +        return "number"
+    +    if isinstance(value, str):
+    +        return "string"
+    +    if isinstance(value, dict):
+    +        if not all(isinstance(key, str) for key in value):
+    +            raise TypeError("document keys must be strings")
+    +        return "document"
+    +    if isinstance(value, list):
+    +        return "array"
+    +    if isinstance(value, ObjectId):
+    +        return "objectId"
+    +    raise TypeError(f"unsupported BSON value: {type(value).__name__}")
+    +
+    +
+    +def clone_document(document: dict[str, Any]) -> dict[str, Any]:
+    +    """Copy at the API boundary so callers cannot mutate stored state."""
+    +
+    +    if type_tag(document) != "document":
+    +        raise TypeError("a document must be a dict with string keys")
+    +    _validate_tree(document)
+    +    # deepcopy is safe because the supported graph contains only value objects.
+    +    return deepcopy(document)
+    +
+    +
+    +def _validate_tree(value: Any) -> None:
+    +    """Validate every nested node before it can cross the storage boundary."""
+    +
+    +    tag = type_tag(value)
+    +    if tag == "document":
+    +        for child in value.values():
+    +            _validate_tree(child)
+    +    elif tag == "array":
+    +        for child in value:
+    +            _validate_tree(child)
+    +
+    +
+    +def bson_equal(left: Any, right: Any) -> bool:
+    +    """Exact value equality; document field order is significant like BSON."""
+    +
+    +    try:
+    +        if type_tag(left) != type_tag(right):
+    +            # BSON numeric values compare by numeric value across int/float.
+    +            return False
+    +    except TypeError:
+    +        return False
+    +    if isinstance(left, float) and isnan(left):
+    +        return isinstance(right, float) and isnan(right)
+    +    if isinstance(left, dict):
+    +        return list(left.keys()) == list(right.keys()) and all(
+    +            bson_equal(left[key], right[key]) for key in left
+    +        )
+    +    if isinstance(left, list):
+    +        return len(left) == len(right) and all(
+    +            bson_equal(a, b) for a, b in zip(left, right)
+    +        )
+    +    return left == right
+    +
+    +
+    +def bson_compare(left: Any, right: Any) -> int:
+    +    """Three-way comparison using MiniMongoDB's documented type order."""
+    +
+    +    left_tag = type_tag(left)
+    +    right_tag = type_tag(right)
+    +    if left_tag != right_tag:
+    +        return (_TYPE_ORDER[left_tag] > _TYPE_ORDER[right_tag]) - (
+    +            _TYPE_ORDER[left_tag] < _TYPE_ORDER[right_tag]
+    +        )
+    +    if bson_equal(left, right):
+    +        return 0
+    +    if left_tag == "document":
+    +        left_items = list(left.items())
+    +        right_items = list(right.items())
+    +        for (left_key, left_value), (right_key, right_value) in zip(
+    +            left_items, right_items
+    +        ):
+    +            if left_key != right_key:
+    +                return (left_key > right_key) - (left_key < right_key)
+    +            compared = bson_compare(left_value, right_value)
+    +            if compared:
+    +                return compared
+    +        return (len(left_items) > len(right_items)) - (
+    +            len(left_items) < len(right_items)
+    +        )
+    +    if left_tag == "array":
+    +        for left_value, right_value in zip(left, right):
+    +            compared = bson_compare(left_value, right_value)
+    +            if compared:
+    +                return compared
+    +        return (len(left) > len(right)) - (len(left) < len(right))
+    +    return (left > right) - (left < right)
+    ```
+
+??? note "File diff: src/minimongodb/errors.py"
+    ```diff
+    diff --git a/src/minimongodb/errors.py b/src/minimongodb/errors.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..1a8275c064e10ec623c7f278b62c07a402d11ede
+    --- /dev/null
+    +++ b/src/minimongodb/errors.py
+    @@ -0,0 +1,29 @@
+    +"""Domain errors keep expected database failures separate from Python bugs."""
+    +
+    +
+    +class MiniMongoError(Exception):
+    +    """Base class for errors intentionally exposed by MiniMongoDB."""
+    +
+    +
+    +class DuplicateKeyError(MiniMongoError):
+    +    """Raised when the unique ``_id`` index already contains a key."""
+    +
+    +
+    +class ImmutableIdError(MiniMongoError):
+    +    """Raised when an update attempts to change or remove ``_id``."""
+    +
+    +
+    +class InvalidQueryError(MiniMongoError):
+    +    """Raised for unsupported or malformed query expressions."""
+    +
+    +
+    +class InvalidUpdateError(MiniMongoError):
+    +    """Raised for malformed updates or incompatible operand types."""
+    +
+    +
+    +class PathError(MiniMongoError):
+    +    """Raised when a dotted path cannot traverse the current container."""
+    +
+    +
+    +class JournalCorruptionError(MiniMongoError):
+    +    """Raised when corruption occurs before the repairable journal tail."""
+    ```
+
+**What it is and why it appears**
+
+MiniMongoDB's BSON subset defines owned document copies, explicit type tags, exact equality, total ordering, ObjectId generation, and dotted reads or writes.
+
+**Runtime role**
+
+Values are validated and copied at the boundary; path traversal then walks mappings and numeric list positions without leaking caller-owned state.
+
+**Statement understanding**
+
+Canonical value semantics must precede indexes, matching, logging, and persistence because all four reuse the same notion of identity.
+
+#### Package, fixture, and project support
+
+Keep exports, test corpora, dependencies, and the runtime environment reproducible.
+
+??? note "Supporting file diffs (3 files)"
+    **`pyproject.toml`**
+
+    ```diff
+    diff --git a/pyproject.toml b/pyproject.toml
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..cce362c72e3b2c9018cabbb986448f894a8d8f6b
+    --- /dev/null
+    +++ b/pyproject.toml
+    @@ -0,0 +1,20 @@
+    +[build-system]
+    +requires = ["hatchling"]
+    +build-backend = "hatchling.build"
+    +
+    +[project]
+    +name = "minimongodb"
+    +version = "0.1.0"
+    +description = "A deterministic document database kernel for teaching"
+    +requires-python = ">=3.12"
+    +dependencies = []
+    +
+    +[dependency-groups]
+    +dev = ["pytest>=9,<10"]
+    +
+    +[tool.hatch.build.targets.wheel]
+    +packages = ["src/minimongodb"]
+    +
+    +[tool.pytest.ini_options]
+    +pythonpath = ["src", "."]
+    +testpaths = ["tests"]
+    ```
+
+    **`src/minimongodb/bson/__init__.py`**
+
+    ```diff
+    diff --git a/src/minimongodb/bson/__init__.py b/src/minimongodb/bson/__init__.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..c4c50774534974cd8976210206fbd8de6c68a844
+    --- /dev/null
+    +++ b/src/minimongodb/bson/__init__.py
+    @@ -0,0 +1,24 @@
+    +"""Teaching BSON subset: deterministic IDs, value order, and dotted paths."""
+    +
+    +from minimongodb.bson.path import MISSING, get_path, set_path, unset_path
+    +from minimongodb.bson.types import (
+    +    CounterObjectIdGenerator,
+    +    ObjectId,
+    +    bson_compare,
+    +    bson_equal,
+    +    clone_document,
+    +    type_tag,
+    +)
+    +
+    +__all__ = [
+    +    "MISSING",
+    +    "CounterObjectIdGenerator",
+    +    "ObjectId",
+    +    "bson_compare",
+    +    "bson_equal",
+    +    "clone_document",
+    +    "get_path",
+    +    "set_path",
+    +    "type_tag",
+    +    "unset_path",
+    +]
+    ```
+
+    **`uv.lock`**
+
+    ```diff
+    diff --git a/uv.lock b/uv.lock
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..482904eaf6e4e2494da73c73a0d12ae12daab4aa
+    --- /dev/null
+    +++ b/uv.lock
+    @@ -0,0 +1,79 @@
+    +version = 1
+    +revision = 3
+    +requires-python = ">=3.12"
+    +
+    +[[package]]
+    +name = "colorama"
+    +version = "0.4.6"
+    +source = { registry = "https://pypi.org/simple" }
+    +sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
+    +wheels = [
+    +    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
+    +]
+    +
+    +[[package]]
+    +name = "iniconfig"
+    +version = "2.3.0"
+    +source = { registry = "https://pypi.org/simple" }
+    +sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730", size = 20503, upload-time = "2025-10-18T21:55:43.219Z" }
+    +wheels = [
+    +    { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
+    +]
+    +
+    +[[package]]
+    +name = "minimongodb"
+    +version = "0.1.0"
+    +source = { editable = "." }
+    +
+    +[package.dev-dependencies]
+    +dev = [
+    +    { name = "pytest" },
+    +]
+    +
+    +[package.metadata]
+    +
+    +[package.metadata.requires-dev]
+    +dev = [{ name = "pytest", specifier = ">=9,<10" }]
+    +
+    +[[package]]
+    +name = "packaging"
+    +version = "26.2"
+    +source = { registry = "https://pypi.org/simple" }
+    +sdist = { url = "https://files.pythonhosted.org/packages/d7/f1/e7a6dd94a8d4a5626c03e4e99c87f241ba9e350cd9e6d75123f992427270/packaging-26.2.tar.gz", hash = "sha256:ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661", size = 228134, upload-time = "2026-04-24T20:15:23.917Z" }
+    +wheels = [
+    +    { url = "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e", size = 100195, upload-time = "2026-04-24T20:15:22.081Z" },
+    +]
+    +
+    +[[package]]
+    +name = "pluggy"
+    +version = "1.6.0"
+    +source = { registry = "https://pypi.org/simple" }
+    +sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
+    +wheels = [
+    +    { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+    +]
+    +
+    +[[package]]
+    +name = "pygments"
+    +version = "2.20.0"
+    +source = { registry = "https://pypi.org/simple" }
+    +sdist = { url = "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f", size = 4955991, upload-time = "2026-03-29T13:29:33.898Z" }
+    +wheels = [
+    +    { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
+    +]
+    +
+    +[[package]]
+    +name = "pytest"
+    +version = "9.1.1"
+    +source = { registry = "https://pypi.org/simple" }
+    +dependencies = [
+    +    { name = "colorama", marker = "sys_platform == 'win32'" },
+    +    { name = "iniconfig" },
+    +    { name = "packaging" },
+    +    { name = "pluggy" },
+    +    { name = "pygments" },
+    +]
+    +sdist = { url = "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz", hash = "sha256:1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313", size = 1636369, upload-time = "2026-06-19T10:58:32.857Z" }
+    +wheels = [
+    +    { url = "https://files.pythonhosted.org/packages/24/25/1de2678b631f5a49215c6c96fff41ba892b0a34df68d6d80292b1b48aa7f/pytest-9.1.1-py3-none-any.whl", hash = "sha256:37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c", size = 386536, upload-time = "2026-06-19T10:58:31.347Z" },
+    +]
+    ```
+
+
+### Verification evidence
+
+Run `uv run pytest -q $(cat journey/stages/01-bson-document-paths/tests.txt)`, then use Journey Check to compare the cumulative source with the canonical Stage.
+
+### Durable takeaways
+
+Canonical value semantics must precede indexes, matching, logging, and persistence because all four reuse the same notion of identity.
+
+### Explain it in your own words
+
+Explain the failure window this Stage closes, how runtime state changes, and which statement protects the boundary.
+
+### Textbook
+
+[Chapter 2](https://github.com/system-in-miniature/mini-mongodb/blob/main/docs/tutorial/02-document-model.md)
+
+[Complete reference patch / 完整参考补丁](https://github.com/system-in-miniature/mini-mongodb/blob/main/journey/stages/01-bson-document-paths/stage.patch)

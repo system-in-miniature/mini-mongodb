@@ -1,0 +1,4 @@
+tests/test_crud.py
+tests/test_update.py
+tests/test_oplog.py
+tests/test_recovery.py

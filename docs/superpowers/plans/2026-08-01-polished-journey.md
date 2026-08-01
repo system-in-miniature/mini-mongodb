@@ -1,6 +1,6 @@
 # MiniMongoDB Polished Journey Implementation Plan
 
-1. Record a twelve-Stage content manifest from exact Git revisions and generate
+1. Record an eight-Stage content manifest from exact Git revisions and generate
    reproducible patches plus focused-test lists.
 2. Reuse the accepted Journey builder, renderer, Agent workspace contract, and
    contract tests from the polished System-in-Miniature template.

@@ -20,6 +20,28 @@ whose proposed source changes are not applied to `src/`.
 对照真实 MongoDB，提供带实测输出的实验，并以练习收束；练习中的源码改动只以
 提案形式呈现，不落到 `src/`。
 
+## Learning modes / 学习模式
+
+### Mechanism Tutorial / 机制教程
+
+Use the existing ten chapters for concept-first study of document values,
+queries, updates, durability, oplogs, indexes, planning, and aggregation. /
+希望先建立概念与运行时心智模型时，按现有十章学习文档值、查询、更新、持久化、
+Oplog、索引、规划与聚合。
+
+### Self-Guided Rebuild / 自主重建
+
+Use the [eight-stage Journey](journey/index.md) to understand each problem, test
+contract, concept boundary, and grouped code diff in a browser. / 使用
+[八阶段重建旅程](zh/journey/index.md)，在浏览器中理解每个问题、测试契约、概念边界
+与按机制分组的代码差异。
+
+### Agent-Guided Rebuild / Agent 带教
+
+Use the [CLI guide](agent-guide.md) when you want Codex to interactively teach,
+implement, and verify one Stage. / 希望由 Codex 互动讲解、实现并验收一个 Stage 时，
+参照 [CLI 使用教程](zh/agent-guide.md)。
+
 ## Before you begin / 开始之前
 
 You need Python 3.12+ and [uv](https://docs.astral.sh/uv/):

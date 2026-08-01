@@ -1,0 +1,380 @@
+# Stage 02 · Array-aware query matching
+
+### Goal
+
+Build array-aware query matching and explain its boundary from an executable counterexample, runtime state, and the critical statement.
+
+??? note "Deliverable files"
+    - `src/minimongodb/query/__init__.py`
+    - `src/minimongodb/query/matcher.py`
+    - `tests/test_array_matching.py`
+    - `tests/test_query.py`
+
+### The problem at this point
+
+Dotted paths and arrays make a query document ambiguous unless scalar element matching and exact compound-value equality are separated.
+
+### Test contract
+
+#### See the failure first
+
+The counterexamples compare scalar-to-array matching, literal array order, exact embedded documents, dotted traversal, logical branches, and unknown operators.
+
+??? note "File diff: tests/test_array_matching.py"
+    ```diff
+    diff --git a/tests/test_array_matching.py b/tests/test_array_matching.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..e3e8dba1e2e45cc762da95ef9d9b27e5bf5e685e
+    --- /dev/null
+    +++ b/tests/test_array_matching.py
+    @@ -0,0 +1,34 @@
+    +"""The project's central lesson: arrays fan out, literal documents do not."""
+    +
+    +from minimongodb.query import matches
+    +
+    +
+    +def test_scalar_equality_automatically_matches_an_array_element() -> None:
+    +    assert matches({"tags": ["database", "python"]}, {"tags": "python"})
+    +    assert not matches({"tags": ["database", "python"]}, {"tags": "rust"})
+    +
+    +
+    +def test_scalar_comparison_automatically_matches_an_array_element() -> None:
+    +    assert matches({"scores": [2, 8]}, {"scores": {"$gt": 7}})
+    +
+    +
+    +def test_literal_array_still_requires_whole_array_equality() -> None:
+    +    document = {"tags": ["database", "python"]}
+    +    assert matches(document, {"tags": ["database", "python"]})
+    +    assert not matches(document, {"tags": ["python", "database"]})
+    +
+    +
+    +def test_nested_document_literal_is_an_exact_whole_value_match() -> None:
+    +    document = {"profile": {"name": "Ada", "city": "London"}}
+    +    assert not matches(document, {"profile": {"name": "Ada"}})
+    +    assert matches(document, {"profile": {"name": "Ada", "city": "London"}})
+    +
+    +
+    +def test_dotted_path_selects_inside_nested_document_instead() -> None:
+    +    document = {"profile": {"name": "Ada", "city": "London"}}
+    +    assert matches(document, {"profile.name": "Ada"})
+    +
+    +
+    +def test_dotted_path_fans_out_through_arrays_of_documents() -> None:
+    +    document = {"items": [{"sku": "A"}, {"sku": "B"}]}
+    +    assert matches(document, {"items.sku": "B"})
+    ```
+
+**What this test locks**
+
+These tests lock the Stage's happy path, boundary conditions, visible failures, and recovery invariants.
+
+**How it constructs the counterexample**
+
+The counterexamples compare scalar-to-array matching, literal array order, exact embedded documents, dotted traversal, logical branches, and unknown operators.
+
+**Key test statement**
+
+```python
+assert matches({"tags": ["database", "python"]}, {"tags": "python"})
+```
+
+This assertion binds the observable result to the Stage's state, visibility, or durability boundary rather than merely checking that a call returned.
+
+**What a failure means**
+
+A failure means the implementation crossed the semantic, ordering, ownership, or recovery boundary just introduced.
+
+??? note "File diff: tests/test_query.py"
+    ```diff
+    diff --git a/tests/test_query.py b/tests/test_query.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..9f0a512137586174fa20becbe26c1df9e8c45e42
+    --- /dev/null
+    +++ b/tests/test_query.py
+    @@ -0,0 +1,37 @@
+    +"""Query operator contract independent of collection storage."""
+    +
+    +import pytest
+    +
+    +from minimongodb.errors import InvalidQueryError
+    +from minimongodb.query import matches
+    +
+    +
+    +@pytest.mark.parametrize(
+    +    ("query", "expected"),
+    +    [
+    +        ({"age": 20}, True),
+    +        ({"age": {"$eq": 20}}, True),
+    +        ({"age": {"$gt": 19, "$lte": 20}}, True),
+    +        ({"age": {"$gte": 20, "$lt": 21}}, True),
+    +        ({"age": {"$ne": 21}}, True),
+    +        ({"age": {"$in": [10, 20]}}, True),
+    +        ({"missing": {"$exists": False}}, True),
+    +        ({"age": {"$exists": True}}, True),
+    +        ({"$and": [{"age": 20}, {"name": "Ada"}]}, True),
+    +        ({"$or": [{"age": 99}, {"name": "Ada"}]}, True),
+    +        ({"age": {"$not": {"$gt": 20}}}, True),
+    +        ({"$not": {"name": "Grace"}}, True),
+    +        ({"age": {"$lt": 20}}, False),
+    +    ],
+    +)
+    +def test_query_operators(query: dict, expected: bool) -> None:
+    +    assert matches({"name": "Ada", "age": 20}, query) is expected
+    +
+    +
+    +def test_ne_matches_a_missing_field() -> None:
+    +    assert matches({}, {"age": {"$ne": 20}})
+    +
+    +
+    +def test_unknown_operator_is_rejected() -> None:
+    +    with pytest.raises(InvalidQueryError):
+    +        matches({"age": 20}, {"age": {"$wat": 20}})
+    ```
+
+**What this test locks**
+
+These tests lock the Stage's happy path, boundary conditions, visible failures, and recovery invariants.
+
+**How it constructs the counterexample**
+
+The counterexamples compare scalar-to-array matching, literal array order, exact embedded documents, dotted traversal, logical branches, and unknown operators.
+
+**Key test statement**
+
+```python
+assert matches({"tags": ["database", "python"]}, {"tags": "python"})
+```
+
+This assertion binds the observable result to the Stage's state, visibility, or durability boundary rather than merely checking that a call returned.
+
+**What a failure means**
+
+A failure means the implementation crossed the semantic, ordering, ownership, or recovery boundary just introduced.
+
+### Basic concepts
+
+A query is a recursive predicate tree. Field resolution may fan out through arrays, while a literal list or document remains one exact BSON value.
+
+### Why this mechanism is necessary
+
+Dotted paths and arrays make a query document ambiguous unless scalar element matching and exact compound-value equality are separated. Without an explicit boundary, every later mechanism would depend on accidental behavior.
+
+### Runtime mental model
+
+The matcher resolves candidate values, applies field operators to them, and combines logical clauses without mutating the document.
+
+### Mechanism blocks
+
+#### Array-aware query matching mechanism
+
+The matcher resolves candidate values, applies field operators to them, and combines logical clauses without mutating the document.
+
+??? note "File diff: src/minimongodb/query/matcher.py"
+    ```diff
+    diff --git a/src/minimongodb/query/matcher.py b/src/minimongodb/query/matcher.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..e37eb05373517792a5fc6c76e2e9f79e95873230
+    --- /dev/null
+    +++ b/src/minimongodb/query/matcher.py
+    @@ -0,0 +1,148 @@
+    +"""Query matcher with deliberate separation of path fan-out and equality.
+    +
+    +The crucial distinction is easy to lose in one clever recursive function:
+    +
+    +* traversing a dotted path may fan out through an array of documents;
+    +* comparing a scalar to an array may inspect each array element;
+    +* comparing a literal document or array remains exact whole-value equality.
+    +
+    +Keeping these steps separate makes the MongoDB-specific behavior visible.
+    +"""
+    +
+    +from __future__ import annotations
+    +
+    +from collections.abc import Iterable
+    +from typing import Any
+    +
+    +from minimongodb.bson import MISSING, bson_compare, bson_equal
+    +from minimongodb.errors import InvalidQueryError
+    +
+    +
+    +def resolve_path(document: Any, path: str) -> list[Any]:
+    +    """Return every value selected by a dotted path, fanning out through arrays."""
+    +
+    +    if not isinstance(path, str) or not path or any(not p for p in path.split(".")):
+    +        raise InvalidQueryError("field path must have non-empty segments")
+    +    return _resolve(document, path.split("."))
+    +
+    +
+    +def _resolve(current: Any, parts: list[str]) -> list[Any]:
+    +    if not parts:
+    +        return [current]
+    +    part, rest = parts[0], parts[1:]
+    +    if isinstance(current, dict):
+    +        if part not in current:
+    +            return []
+    +        return _resolve(current[part], rest)
+    +    if isinstance(current, list):
+    +        if part.isdigit():
+    +            position = int(part)
+    +            return _resolve(current[position], rest) if position < len(current) else []
+    +        # Do not consume the part: each element must still resolve that field.
+    +        return [
+    +            value
+    +            for element in current
+    +            for value in _resolve(element, parts)
+    +        ]
+    +    return []
+    +
+    +
+    +def _array_candidates(value: Any, expected: Any) -> Iterable[Any]:
+    +    """Expand stored arrays only when the query operand is scalar-like."""
+    +
+    +    if isinstance(value, list) and not isinstance(expected, (list, dict)):
+    +        for item in value:
+    +            # Nested arrays also expose scalar leaves for this teaching subset.
+    +            yield from _array_candidates(item, expected)
+    +    else:
+    +        yield value
+    +
+    +
+    +def _equals(value: Any, expected: Any) -> bool:
+    +    return any(bson_equal(candidate, expected) for candidate in _array_candidates(value, expected))
+    +
+    +
+    +def _compare(value: Any, expected: Any, operator: str) -> bool:
+    +    def accepted(candidate: Any) -> bool:
+    +        compared = bson_compare(candidate, expected)
+    +        return {
+    +            "$gt": compared > 0,
+    +            "$gte": compared >= 0,
+    +            "$lt": compared < 0,
+    +            "$lte": compared <= 0,
+    +        }[operator]
+    +
+    +    try:
+    +        return any(accepted(candidate) for candidate in _array_candidates(value, expected))
+    +    except TypeError:
+    +        return False
+    +
+    +
+    +def _operator_matches(values: list[Any], operator: str, operand: Any) -> bool:
+    +    present = bool(values)
+    +    if operator == "$exists":
+    +        if not isinstance(operand, bool):
+    +            raise InvalidQueryError("$exists requires a boolean")
+    +        return present is operand
+    +    if operator == "$ne":
+    +        return not any(_equals(value, operand) for value in values)
+    +    if operator == "$not":
+    +        if not isinstance(operand, dict):
+    +            raise InvalidQueryError("$not requires an operator document")
+    +        return not _field_matches(values, operand)
+    +    if not present:
+    +        return False
+    +    if operator == "$eq":
+    +        return any(_equals(value, operand) for value in values)
+    +    if operator in {"$gt", "$gte", "$lt", "$lte"}:
+    +        return any(_compare(value, operand, operator) for value in values)
+    +    if operator == "$in":
+    +        if not isinstance(operand, list):
+    +            raise InvalidQueryError("$in requires an array")
+    +        return any(
+    +            _equals(value, option) for value in values for option in operand
+    +        )
+    +    raise InvalidQueryError(f"unsupported query operator: {operator}")
+    +
+    +
+    +def _field_matches(values: list[Any], condition: Any) -> bool:
+    +    if isinstance(condition, dict) and any(
+    +        isinstance(key, str) and key.startswith("$") for key in condition
+    +    ):
+    +        if not all(isinstance(key, str) and key.startswith("$") for key in condition):
+    +            raise InvalidQueryError("cannot mix operators and literal fields")
+    +        return all(
+    +            _operator_matches(values, operator, operand)
+    +            for operator, operand in condition.items()
+    +        )
+    +    return bool(values) and any(_equals(value, condition) for value in values)
+    +
+    +
+    +def matches(document: dict[str, Any], query: dict[str, Any] | None = None) -> bool:
+    +    """Return whether a document satisfies the supported Mongo-shaped query."""
+    +
+    +    if query is None:
+    +        query = {}
+    +    if not isinstance(query, dict):
+    +        raise InvalidQueryError("query must be a document")
+    +    for key, condition in query.items():
+    +        if key == "$and":
+    +            if not isinstance(condition, list):
+    +                raise InvalidQueryError("$and requires an array")
+    +            if not all(matches(document, child) for child in condition):
+    +                return False
+    +        elif key == "$or":
+    +            if not isinstance(condition, list):
+    +                raise InvalidQueryError("$or requires an array")
+    +            if not any(matches(document, child) for child in condition):
+    +                return False
+    +        elif key == "$not":
+    +            if not isinstance(condition, dict):
+    +                raise InvalidQueryError("$not requires a query document")
+    +            if matches(document, condition):
+    +                return False
+    +        elif key.startswith("$"):
+    +            raise InvalidQueryError(f"unsupported logical operator: {key}")
+    +        elif not _field_matches(resolve_path(document, key), condition):
+    +            return False
+    +    return True
+    ```
+
+**What it is and why it appears**
+
+A query is a recursive predicate tree. Field resolution may fan out through arrays, while a literal list or document remains one exact BSON value.
+
+**Runtime role**
+
+The matcher resolves candidate values, applies field operators to them, and combines logical clauses without mutating the document.
+
+**Statement understanding**
+
+Keeping traversal and equality distinct prevents a partial embedded document from silently behaving like a dotted-field query.
+
+#### Package, fixture, and project support
+
+Keep exports, test corpora, dependencies, and the runtime environment reproducible.
+
+??? note "Supporting file diffs (1 file)"
+    **`src/minimongodb/query/__init__.py`**
+
+    ```diff
+    diff --git a/src/minimongodb/query/__init__.py b/src/minimongodb/query/__init__.py
+    new file mode 100644
+    index 0000000000000000000000000000000000000000..50d90024afacb17c66697886dcad913cc9904af5
+    --- /dev/null
+    +++ b/src/minimongodb/query/__init__.py
+    @@ -0,0 +1,5 @@
+    +"""Mongo-shaped query matching over in-memory teaching documents."""
+    +
+    +from minimongodb.query.matcher import matches, resolve_path
+    +
+    +__all__ = ["matches", "resolve_path"]
+    ```
+
+
+### Verification evidence
+
+Run `uv run pytest -q $(cat journey/stages/02-array-aware-queries/tests.txt)`, then use Journey Check to compare the cumulative source with the canonical Stage.
+
+### Durable takeaways
+
+Keeping traversal and equality distinct prevents a partial embedded document from silently behaving like a dotted-field query.
+
+### Explain it in your own words
+
+Explain the failure window this Stage closes, how runtime state changes, and which statement protects the boundary.
+
+### Textbook
+
+[Chapter 3](https://github.com/system-in-miniature/mini-mongodb/blob/main/docs/tutorial/03-queries.md)
+
+[Complete reference patch / 完整参考补丁](https://github.com/system-in-miniature/mini-mongodb/blob/main/journey/stages/02-array-aware-queries/stage.patch)

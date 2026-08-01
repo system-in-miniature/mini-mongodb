@@ -1,0 +1,2 @@
+tests/test_query.py
+tests/test_array_matching.py

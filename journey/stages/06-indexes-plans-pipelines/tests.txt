@@ -1,0 +1,3 @@
+tests/test_indexes.py
+tests/test_planner.py
+tests/test_aggregate.py

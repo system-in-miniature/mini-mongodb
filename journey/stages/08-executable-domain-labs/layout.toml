@@ -1,0 +1,9 @@
+failure_files = ["tests/test_labs.py"]
+
+[[blocks]]
+id = "mechanism"
+title_en = "Executable domain experiments mechanism"
+title_zh = "可执行领域实验机制"
+summary_en = "Each process constructs one counterexample, prints the important before-and-after state, and exits without relying on private fixtures or prior data."
+summary_zh = "每个进程构造一个反例、打印关键前后状态，并且不依赖私有 Fixture 或已有数据即可退出。"
+files = ["labs/lab_array_matching.py", "labs/lab_crash_recovery.py", "labs/lab_explain.py", "labs/lab_multikey_index.py", "labs/lab_oplog_idempotent.py"]
