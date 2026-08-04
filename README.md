@@ -151,3 +151,10 @@ evidence about production MongoDB.
 ## Trademark Notice
 
 MiniMongoDB is an independent educational project. It is not affiliated with, endorsed by, or sponsored by MongoDB, Inc.. "MongoDB" is a trademark of its respective owner.
+
+## Verification
+
+On 2026-08-04, `.venv/bin/python -m pytest` completed with **99 passed,
+0 skipped, and 0 failed** across 13 test files (25 source modules,
+~2,362 lines). No benchmark suite yet; the family-wide benchmark protocol
+lives in the sibling kernels (see MiniPostgres/MiniRedis `bench/`).
