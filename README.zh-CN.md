@@ -143,6 +143,14 @@ multikey 索引，规划器再选择 Mongo 术语的 scan，聚合管道最后�
 在把成功运行实验当作生产级 MongoDB 的证据之前，请阅读
 [概念映射](docs/zh/mapping.md)和[已声明的差异](docs/zh/DIFFERENCES.md)。
 
+## 可量化的机制证据
+
+在选择率固定为 1% 的 100、1,000、10,000 文档夹具上，`kind_1` IXSCAN
+相对 COLLSCAN 把 Docs Examined 稳定减少 100 倍。10,000 文档时由 10,000
+降至 100，并且建索引前后的结果完全一致。这是确定性的 Explain 工作量计数，
+不是耗时加速或生产 MongoDB 容量声明。证据见[中文协议](bench/PROTOCOL.zh-CN.md)、
+[中文报告](bench/results/2026-08-10/report.zh-CN.md)与相邻原始 JSON。
+
 ## 商标声明
 
 MiniMongoDB 是独立的教学项目，与 MongoDB, Inc. 无隶属、背书或赞助关系。"MongoDB" 商标归其所有者所有。

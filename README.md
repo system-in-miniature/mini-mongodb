@@ -154,7 +154,9 @@ MiniMongoDB is an independent educational project. It is not affiliated with, en
 
 ## Verification
 
-On 2026-08-04, `.venv/bin/python -m pytest` completed with **99 passed,
-0 skipped, and 0 failed** across 13 test files (25 source modules,
-~2,362 lines). No benchmark suite yet; the family-wide benchmark protocol
-lives in the sibling kernels (see MiniPostgres/MiniRedis `bench/`).
+On 2026-08-10, the acceptance candidate completed the full test suite. The
+independent [planner-work evidence package](bench/PROTOCOL.md) also compares the
+same 1%-selective query before and after indexing at 100, 1,000, and 10,000
+documents. At 10,000 documents, IXSCAN reduced `docsExamined` from 10,000 to
+100 (100x less deterministic planner work) while preserving identical results.
+This is an explain-counter result, not a wall-time or production MongoDB claim.

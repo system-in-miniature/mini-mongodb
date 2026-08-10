@@ -323,6 +323,15 @@ Fresh-process execution closes the domain loop: imports, public ownership, persi
 
 Run `uv run pytest -q $(cat journey/stages/08-executable-domain-labs/tests.txt)`, then use Journey Check to compare the cumulative source with the canonical Stage.
 
+#### Quantified planner evidence
+
+The deterministic evidence harness repeats one 1%-selective query at 100,
+1,000, and 10,000 documents. Building `kind_1` changes COLLSCAN into IXSCAN and
+reduces documents examined by 100x at every scale; at 10,000 documents the
+counter falls from 10,000 to 100 while the returned result list stays equal.
+This is planner-work evidence, not elapsed-time speedup or production MongoDB
+capacity.
+
 ### Durable takeaways
 
 Fresh-process execution closes the domain loop: imports, public ownership, persistence, and observable terminology must work together.

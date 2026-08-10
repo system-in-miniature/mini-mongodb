@@ -1,0 +1,49 @@
+{
+  "environment": {
+    "machine": "x86_64",
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.31",
+    "python": "3.13.9"
+  },
+  "fixture": {
+    "query": {
+      "kind": "rare"
+    },
+    "rare_every": 100
+  },
+  "measurements": [
+    {
+      "after_docs_examined": 1,
+      "after_keys_examined": 1,
+      "after_stage": "IXSCAN",
+      "before_docs_examined": 100,
+      "before_stage": "COLLSCAN",
+      "documents": 100,
+      "matches": 1,
+      "results_equal": true,
+      "work_reduction": 100.0
+    },
+    {
+      "after_docs_examined": 10,
+      "after_keys_examined": 1,
+      "after_stage": "IXSCAN",
+      "before_docs_examined": 1000,
+      "before_stage": "COLLSCAN",
+      "documents": 1000,
+      "matches": 10,
+      "results_equal": true,
+      "work_reduction": 100.0
+    },
+    {
+      "after_docs_examined": 100,
+      "after_keys_examined": 1,
+      "after_stage": "IXSCAN",
+      "before_docs_examined": 10000,
+      "before_stage": "COLLSCAN",
+      "documents": 10000,
+      "matches": 100,
+      "results_equal": true,
+      "work_reduction": 100.0
+    }
+  ],
+  "protocol_version": 1
+}

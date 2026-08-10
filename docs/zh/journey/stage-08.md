@@ -323,6 +323,13 @@ Lab 是只使用导出 API 的小型端到端观察面，把内部不变量连�
 
 运行 `uv run pytest -q $(cat journey/stages/08-executable-domain-labs/tests.txt)`，再用 Journey Check 比较累计源码与标准 Stage。
 
+#### 可量化的 Planner 证据
+
+确定性证据 Harness 在 100、1,000、10,000 个文档上重复同一个 1% 选择率查询。
+创建 `kind_1` 后由 COLLSCAN 变为 IXSCAN，每个规模的 Docs Examined 都减少
+100 倍；10,000 文档时从 10,000 降至 100，结果列表仍完全一致。这是 Planner
+工作量证据，不是耗时加速或生产 MongoDB 容量声明。
+
 ### 需要真正记住的内容
 
 新进程执行闭合领域回路：导入、公共所有权、持久化与可观察术语必须协同工作。
